@@ -606,6 +606,8 @@ code {
 
 .badge {
   display: inline-block;
+  align-self: start;
+  justify-self: start;
   padding: 4px 10px;
   border-radius: 999px;
   font-family: var(--sans);
@@ -1416,6 +1418,14 @@ html.js .turn.is-hidden {
   align-items: start;
 }
 
+.turn__layout--single {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.turn__layout--single .events {
+  max-width: 840px;
+}
+
 .turn__map {
   margin: 0;
   position: sticky;
@@ -1455,6 +1465,7 @@ html.js .turn.is-hidden {
   gap: 18px;
   padding: 20px 0;
   border-top: 1px solid var(--line-soft);
+  align-items: start;
 }
 
 .event:first-child {
@@ -1793,6 +1804,10 @@ html.js .turn.is-hidden {
 
   .hero__media {
     width: 100%;
+  }
+
+  .hero__media img {
+    opacity: 0.42;
   }
 
   .hero::after {

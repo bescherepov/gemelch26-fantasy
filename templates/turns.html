@@ -33,7 +33,7 @@
     <p class="turn__lead">{{ t.lead }}</p>
   </header>
 
-  <div class="turn__layout">
+  <div class="turn__layout{% if not t.map %} turn__layout--single{% endif %}">
     {% if t.map %}
     <figure class="turn__map">
       <a href="{{ t.map.image }}" target="_blank" rel="noopener">
