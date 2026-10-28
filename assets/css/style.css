@@ -377,7 +377,16 @@ code {
   max-width: 46ch;
 }
 
-.hero__facts,
+.hero__facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px 24px;
+  max-width: 430px;
+  list-style: none;
+  margin: 1.4em 0;
+  padding: 0;
+}
+
 .stat-row {
   display: flex;
   flex-wrap: wrap;
