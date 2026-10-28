@@ -12,7 +12,8 @@
 
 Полная архитектура — в [CONCEPT.md](CONCEPT.md), быстрый старт — в [README.md](README.md).
 
-Текущее состояние: 3 хода, 36 событий, 9 народов, 4 карты, 10 страниц, 34 теста.
+Текущее состояние: 3 хода, 36 событий, 9 народов, 4 карты, 136 построек,
+11 страниц, 36 тестов.
 
 ---
 
@@ -27,7 +28,8 @@
    CSS или JS. В шаблонах допустим только интерфейсный текст («Ходы», «Фильтр»).
 2. **`dist/` не редактируется и не коммитится.** Он пересоздаётся при каждой сборке.
 3. **Один факт — одна запись.** Событие описано только в своём ходе; карта — только
-   в `data/maps.json`; таблица — только в `data/tables.json`.
+   в `data/maps.json`; таблица — только в `data/tables.json`; постройка — только
+   в `data/buildings.json`.
 4. **Ссылки на файлы, а не копии.** В данных — путь к изображению, сам файл лежит
    в `assets/img` один раз.
 5. **Только проверяемые факты.** Источники: `sources/*.docx`, хроника мастера на
@@ -48,6 +50,7 @@ gemelch26-fantasy/
 │   ├── ethnoses.json             # девять народов
 │   ├── maps.json                 # каталог карт
 │   ├── tables.json               # игровые таблицы
+│   ├── buildings.json            # постройки и местные правила
 │   ├── participants.json         # рассадка
 │   ├── links.json                # внешние ссылки
 │   ├── changelog.json            # курируемые записи лога
@@ -84,6 +87,7 @@ gemelch26-fantasy/
 | `turns/NNN.json` | ход | `number`, `year`, `title`, `lead`, `events[]` |
 | `maps.json` | карты | `categories[]`, `maps[].id/category/title/caption/file` |
 | `tables.json` | таблицы | `tables[].id/title/file` |
+| `buildings.json` | постройки | `buildings[].id/name/category/location`, `changes[].id` |
 | `participants.json` | рассадка | `title`, `intro`, `count`, `image`, `notes[]` |
 | `links.json` | ссылки | `links[].id/title/url/description` |
 | `changelog.json` | лог | `entries[].date/text` |
@@ -131,6 +135,8 @@ gemelch26-fantasy/
 - цвета в формате `#rrggbb`;
 - все упомянутые изображения существуют;
 - категории карт объявлены;
+- у построек известная категория, а местные правила ссылаются на существующие
+  постройки и наоборот;
 - даты лога в формате `ГГГГ-ММ-ДД`;
 - пункты меню ведут на реально собираемые страницы.
 
@@ -154,6 +160,13 @@ gemelch26-fantasy/
 
 Запись в `data/maps.json` или `data/tables.json` + файл в `assets/img`.
 Страницы, галерея и превью на главной обновятся автоматически.
+
+### Добавить постройку
+
+Запись в `data/buildings.json → buildings[]` с уникальным `id` и объявленной
+категорией. Если на постройку действует местное правило партии, укажи
+`local_rule` с `id` из `changes[]` — правило должно ссылаться на неё же.
+Перекрёстные ссылки проверяет валидатор, карточка и поиск обновятся сами.
 
 ### Добавить народ
 
@@ -191,7 +204,7 @@ gemelch26-fantasy/
 
 ```bash
 python scripts/validate.py            # данные
-python -m unittest discover -s tests  # 34 теста движка и сборки
+python -m unittest discover -s tests  # 36 тестов движка и сборки
 python build.py                       # dist/
 python scripts/validate.py --dist     # ссылки, якоря, h1, meta
 python -m http.server 8000 -d dist    # локальный просмотр

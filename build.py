@@ -43,6 +43,7 @@ PAGE_FILES = [
     "turns.html",
     "maps.html",
     "tables.html",
+    "buildings.html",
     "participants.html",
     "log.html",
     "links.html",
@@ -127,6 +128,59 @@ def check_assets(turns: list[dict], maps: dict, tables: dict) -> None:
         fail("не найдены изображения: " + ", ".join(missing))
 
 
+FACT_FIELDS = (
+    ("cost", "Стоимость"),
+    ("income", "Доход"),
+    ("base", "Производство"),
+    ("input", "Сырьё"),
+    ("conditions", "Требования"),
+    ("resource", "Ресурс"),
+    ("location", "Где"),
+    ("climate", "Климат"),
+    ("terrain", "Местность"),
+    ("bonuses", "Инновации и традиции"),
+)
+
+
+def prepare_buildings(raw: dict) -> dict:
+    """Раскладывает постройки по категориям и связывает их с местными правилами."""
+    buildings = raw["buildings"]
+    by_id = {building["id"]: building for building in buildings}
+    changes = {change["id"]: change for change in raw["changes"]}
+
+    for change in raw["changes"]:
+        items = []
+        for building_id in change["buildings"]:
+            if building_id not in by_id:
+                fail(f"buildings.json: правило «{change['id']}» ссылается на неизвестную постройку {building_id}")
+            items.append(by_id[building_id])
+        change["items"] = items
+
+    for building in buildings:
+        rule = building.get("local_rule")
+        if rule and rule not in changes:
+            fail(f"buildings.json: у постройки «{building['name']}» неизвестное правило «{rule}»")
+        building["local"] = changes.get(rule) if rule else None
+        building["has_group"] = bool(building["group"]) and building["group"] != building["name"]
+        building["facts"] = [
+            {"label": label, "value": building[key].strip()}
+            for key, label in FACT_FIELDS
+            if building[key].strip()
+            and building[key].strip() != "—"
+            and not (key == "resource" and building[key].strip() == "нет")
+            and not (key in ("climate", "terrain") and building[key].strip().lower() == "все")
+        ]
+
+    for category in raw["categories"]:
+        category["items"] = [
+            building for building in buildings if building["category"] == category["id"]
+        ]
+        category["count"] = len(category["items"])
+
+    raw["total"] = len(buildings)
+    return raw
+
+
 def build() -> None:
     site = load_json(DATA / "site.json")
     world = load_json(DATA / "world.json")
@@ -134,6 +188,7 @@ def build() -> None:
     ethnoses = load_json(DATA / "ethnoses.json")
     maps = load_json(DATA / "maps.json")
     tables = load_json(DATA / "tables.json")
+    buildings = prepare_buildings(load_json(DATA / "buildings.json"))
     links = load_json(DATA / "links.json")
     participants = load_json(DATA / "participants.json")
     changelog = load_json(DATA / "changelog.json")
@@ -151,6 +206,7 @@ def build() -> None:
         "events": sum(len(turn["events"]) for turn in turns),
         "ethnoses": len(ethnoses["ethnoses"]),
         "maps": len(maps["maps"]),
+        "buildings": buildings["total"],
         "years": f"{turns[0]['year']}–{latest['year']}",
     }
 
@@ -198,6 +254,7 @@ def build() -> None:
         "ethnoses": ethnoses,
         "maps": maps,
         "tables": tables,
+        "buildings": buildings,
         "links": links,
         "participants": participants,
         "changelog": changelog,
@@ -223,6 +280,7 @@ def build() -> None:
         ("turns.html", "turns.html", "turns", "Ходы", "Хроника партии по ходам: события, войны и решения."),
         ("maps.html", "maps.html", "maps", "Карты", maps["intro"]),
         ("tables.html", "tables.html", "tables", "Таблицы", tables["intro"]),
+        ("buildings.html", "buildings.html", "buildings", "Постройки", buildings["description"]),
         ("participants.html", "participants.html", "participants", "Рассадка", participants["intro"]),
         ("log.html", "log.html", "log", "Лог", "История изменений сайта и хроники."),
         ("links.html", "links.html", "links", "Ссылки", "Первоисточники и материалы партии."),
@@ -271,7 +329,8 @@ def build() -> None:
         f"{stats['turns']} {plural(stats['turns'], 'ход', 'хода', 'ходов')}, "
         f"{stats['events']} {plural(stats['events'], 'событие', 'события', 'событий')}, "
         f"{stats['ethnoses']} {plural(stats['ethnoses'], 'народ', 'народа', 'народов')}, "
-        f"{stats['maps']} {plural(stats['maps'], 'карта', 'карты', 'карт')} → dist/"
+        f"{stats['maps']} {plural(stats['maps'], 'карта', 'карты', 'карт')}, "
+        f"{stats['buildings']} {plural(stats['buildings'], 'постройка', 'постройки', 'построек')} → dist/"
     )
 
 

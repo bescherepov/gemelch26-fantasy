@@ -15,6 +15,7 @@
     { "id": "turns", "title": "Ходы", "url": "turns.html" },
     { "id": "maps", "title": "Карты", "url": "maps.html" },
     { "id": "tables", "title": "Таблицы", "url": "tables.html" },
+    { "id": "buildings", "title": "Постройки", "url": "buildings.html" },
     { "id": "participants", "title": "Рассадка", "url": "participants.html" },
     { "id": "log", "title": "Лог", "url": "log.html" },
     { "id": "links", "title": "Ссылки", "url": "links.html" }

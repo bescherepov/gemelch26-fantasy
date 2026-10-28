@@ -1,0 +1,75 @@
+<header class="page-head page-head--tight">
+  <p class="kicker">Справочник</p>
+  <h1>{{ buildings.title }}</h1>
+  <p class="lead">{{ buildings.lead }}</p>
+</header>
+
+<p class="catalog-note">{{ buildings.intro }}</p>
+
+<section class="section section--band" id="changes">
+  <header class="section__head">
+    <div>
+      <p class="kicker">Местные правила</p>
+      <h2>Что изменилось в этой партии</h2>
+    </div>
+  </header>
+  <p class="section__lead">Эти семь правил отличают Расфадаль от прошлой партии. Они уже учтены в карточках — ищите значок «Местное правило».</p>
+  <ol class="changes">
+    {% for change in buildings.changes %}
+    <li class="change" id="change-{{ change.id }}">
+      <span class="change__num">{{ loop.index }}</span>
+      <div class="change__body">
+        <h3>{{ change.title }}</h3>
+        <p>{{ change.text }}</p>
+        <p class="change__links">Постройки: {% for b in change.items %}<a href="#b-{{ b.id }}">{{ b.name }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</p>
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+
+<nav class="cat-nav" aria-label="Разделы построек">
+  {% for category in buildings.categories %}
+  <a class="cat-nav__link" href="#cat-{{ category.id }}">{{ category.title }}<span class="cat-nav__count">{{ category.count }}</span></a>
+  {% endfor %}
+</nav>
+
+<div class="search" data-buildings-search hidden>
+  <label class="sr-only" for="building-search">Поиск по постройкам</label>
+  <input class="search__input" id="building-search" type="search" placeholder="Поиск: название, ресурс, требование, товар…" autocomplete="off" spellcheck="false" data-buildings-input>
+  <span class="search__hint" data-buildings-hint role="status" aria-live="polite"></span>
+</div>
+
+{% for category in buildings.categories %}
+<section class="section" id="cat-{{ category.id }}">
+  <header class="section__head">
+    <div>
+      <p class="kicker">Постройки</p>
+      <h2>{{ category.title }}</h2>
+    </div>
+    <span class="section__note">{{ category.count }}&nbsp;шт.</span>
+  </header>
+  <p class="section__lead">{{ category.intro }}</p>
+  <div class="buildings">
+    {% for b in category.items %}
+    <article class="building" id="b-{{ b.id }}" data-category="{{ category.id }}">
+      <header class="building__head">
+        <h3 class="building__name">{{ b.name }}</h3>
+        {% if b.local %}<a class="building__flag" href="#change-{{ b.local.id }}" title="{{ b.local.title }}">Местное правило</a>{% endif %}
+      </header>
+      {% if b.has_group %}<p class="building__group">Вариант постройки «{{ b.group }}»</p>{% endif %}
+      <dl class="building__facts">
+        {% for fact in b.facts %}
+        <div class="building__fact">
+          <dt>{{ fact.label }}</dt>
+          <dd>{{ fact.value }}</dd>
+        </div>
+        {% endfor %}
+      </dl>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endfor %}
+
+<p class="page-foot-note">{{ buildings.note }} Цены товаров — в разделе <a href="tables.html">«Таблицы»</a>, полные правила системы — в <a href="links.html">«Ссылках»</a>.</p>

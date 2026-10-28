@@ -17,6 +17,7 @@ PAGES = [
     "turns.html",
     "maps.html",
     "tables.html",
+    "buildings.html",
     "participants.html",
     "log.html",
     "links.html",
@@ -76,6 +77,27 @@ class BuildTest(unittest.TestCase):
         self.assertIn("html.js .turn.is-hidden", (ROOT / "assets/css/style.css").read_text(encoding="utf-8"))
         self.assertIn("turn-1", turns)
         self.assertIn("turn-2", turns)
+
+    def test_buildings_catalog_and_local_rules(self):
+        page = (DIST / "buildings.html").read_text(encoding="utf-8")
+        self.assertIn('id="changes"', page)
+        self.assertIn('id="b-svinarnik"', page)
+        self.assertIn("Местное правило", page)
+        self.assertIn("data-buildings-input", page)
+        self.assertIn('id="cat-agriculture"', page)
+        self.assertIn('id="cat-military"', page)
+        self.assertNotIn("инн «Пенька»", page)
+
+    def test_local_rules_linked(self):
+        import json
+
+        data = json.loads((ROOT / "data/buildings.json").read_text(encoding="utf-8"))
+        page = (DIST / "buildings.html").read_text(encoding="utf-8")
+        for change in data["changes"]:
+            with self.subTest(rule=change["id"]):
+                self.assertIn(f'id="change-{change["id"]}"', page)
+                for building_id in change["buildings"]:
+                    self.assertIn(f'id="b-{building_id}"', page)
 
     def test_validate_and_links(self):
         result = run("scripts/validate.py", "--dist")

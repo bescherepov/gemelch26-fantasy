@@ -258,6 +258,81 @@ def check_gallery() -> tuple[dict | None, dict | None]:
     return maps, tables
 
 
+def check_buildings() -> None:
+    """Постройки: категории, местные правила и перекрёстные ссылки."""
+    data = load("buildings.json")
+    if not data:
+        return
+    for key in ("title", "lead", "intro", "note", "description"):
+        text(data, key, "buildings.json")
+
+    categories = data.get("categories", [])
+    if not categories:
+        err("buildings.json: нет ни одной категории")
+    category_ids = set()
+    for index, category in enumerate(categories):
+        where = f"buildings.json → categories[{index}]"
+        for key in ("id", "title", "intro"):
+            text(category, key, where)
+        if category.get("id") in category_ids:
+            err(f"{where}: повторяющийся id «{category.get('id')}»")
+        category_ids.add(category.get("id"))
+
+    changes = data.get("changes", [])
+    if not changes:
+        err("buildings.json: нет ни одного местного правила")
+    change_ids = set()
+    links: dict[str, set[str]] = {}
+    for index, change in enumerate(changes):
+        where = f"buildings.json → changes[{index}]"
+        for key in ("id", "title", "text"):
+            text(change, key, where)
+        if change.get("id") in change_ids:
+            err(f"{where}: повторяющийся id «{change.get('id')}»")
+        change_ids.add(change.get("id"))
+        ids = change.get("buildings")
+        if not isinstance(ids, list) or not ids:
+            err(f"{where}: buildings должен быть непустым списком id")
+            continue
+        for building_id in ids:
+            links.setdefault(building_id, set()).add(change.get("id"))
+
+    buildings = data.get("buildings", [])
+    if not buildings:
+        err("buildings.json: нет ни одной постройки")
+    seen = set()
+    rules: dict[str, str] = {}
+    for index, building in enumerate(buildings):
+        where = f"buildings.json → buildings[{index}]"
+        for key in ("id", "name", "category", "location"):
+            text(building, key, where)
+        if building.get("id") in seen:
+            err(f"{where}: повторяющийся id «{building.get('id')}»")
+        seen.add(building.get("id"))
+        if building.get("category") not in category_ids:
+            err(f"{where}: неизвестная категория «{building.get('category')}»")
+        rule = building.get("local_rule")
+        if rule:
+            if rule not in change_ids:
+                err(f"{where}: неизвестное местное правило «{rule}»")
+            else:
+                rules[building.get("id")] = rule
+
+    for building_id, change_ids_for_building in links.items():
+        if building_id not in seen:
+            err(f"buildings.json: местное правило ссылается на неизвестную постройку «{building_id}»")
+            continue
+        for change_id in change_ids_for_building:
+            if rules.get(building_id) != change_id:
+                err(
+                    f"buildings.json: постройка «{building_id}» не отмечена правилом «{change_id}»"
+                )
+
+    for building_id, rule in rules.items():
+        if rule not in links.get(building_id, set()):
+            err(f"buildings.json: правило «{rule}» не ссылается на постройку «{building_id}»")
+
+
 def check_links_and_misc() -> None:
     links = load("links.json")
     if links:
@@ -419,6 +494,7 @@ def main() -> int:
     check_ethnoses()
     turns = check_turns()
     check_gallery()
+    check_buildings()
     check_links_and_misc()
 
     if errors:

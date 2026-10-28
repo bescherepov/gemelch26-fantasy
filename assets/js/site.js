@@ -313,6 +313,59 @@
   }
 
   /* ---------------------------------------------------------------------- */
+  /* Постройки: поиск по каталогу                                            */
+  /* ---------------------------------------------------------------------- */
+
+  var buildingSearch = document.querySelector("[data-buildings-search]");
+  var buildingInput = document.querySelector("[data-buildings-input]");
+  var buildingHint = document.querySelector("[data-buildings-hint]");
+
+  if (buildingSearch && buildingInput) {
+    var buildingCards = Array.prototype.slice.call(document.querySelectorAll(".building"));
+    var buildingSections = Array.prototype.slice.call(
+      document.querySelectorAll('section[id^="cat-"]')
+    );
+
+    buildingSearch.hidden = false;
+
+    function filterBuildings() {
+      var query = normalize(buildingInput.value.trim());
+      var found = 0;
+
+      buildingCards.forEach(function (card) {
+        var match = !query || normalize(card.textContent).indexOf(query) !== -1;
+        card.hidden = !match;
+        if (match) {
+          found += 1;
+        }
+      });
+
+      buildingSections.forEach(function (section) {
+        var visible = section.querySelectorAll(".building:not([hidden])").length;
+        section.hidden = query !== "" && visible === 0;
+      });
+
+      if (buildingHint) {
+        if (!query) {
+          buildingHint.textContent = "";
+        } else if (found) {
+          buildingHint.textContent = "Найдено построек: " + found;
+        } else {
+          buildingHint.textContent = "Ничего не найдено";
+        }
+      }
+    }
+
+    buildingInput.addEventListener("input", filterBuildings);
+    buildingInput.addEventListener("keydown", function (event) {
+      if (event.key === "Escape") {
+        buildingInput.value = "";
+        filterBuildings();
+      }
+    });
+  }
+
+  /* ---------------------------------------------------------------------- */
   /* Отступ для якорей при прокрутке                                         */
   /* ---------------------------------------------------------------------- */
 
