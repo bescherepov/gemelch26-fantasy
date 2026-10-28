@@ -5,6 +5,11 @@
 в лог из сообщений коммитов. Курируемые записи (например, о старте партии)
 сохраняются, если их ещё нет в истории.
 
+В лог не попадают:
+- merge/revert/WIP-коммиты;
+- коммит, который создаёт data/site.json, — это публикация сайта, а не
+  изменение игровых данных.
+
 Запускается в CI перед сборкой; безопасен при отсутствии git.
 """
 
@@ -26,18 +31,10 @@ def normalize(text: str) -> str:
     return re.sub(r"\s+", " ", text.strip().rstrip(".")).lower()
 
 
-def git_entries() -> list[dict]:
-    command = [
-        "git",
-        "log",
-        "--date=short",
-        "--pretty=format:%ad%x09%s",
-        "--",
-        "data",
-    ]
+def run_git(args: list[str]) -> str:
     try:
         result = subprocess.run(
-            command,
+            ["git", *args],
             cwd=ROOT,
             capture_output=True,
             text=True,
@@ -46,17 +43,36 @@ def git_entries() -> list[dict]:
             check=False,
         )
     except FileNotFoundError:
-        return []
+        return ""
     if result.returncode != 0:
+        return ""
+    return result.stdout
+
+
+def foundation_commits() -> set[str]:
+    """Коммиты, которые создали data/site.json (первичная публикация сайта)."""
+    output = run_git(["log", "--diff-filter=A", "--format=%H", "--", "data/site.json"])
+    return {line.strip() for line in output.splitlines() if line.strip()}
+
+
+def git_entries() -> list[dict]:
+    output = run_git(
+        ["log", "--date=short", "--pretty=format:%H%x09%ad%x09%s", "--", "data"]
+    )
+    if not output:
         return []
 
+    skip_hashes = foundation_commits()
+
     entries = []
-    for line in result.stdout.splitlines():
-        if "\t" not in line:
+    for line in output.splitlines():
+        parts = line.split("\t", 2)
+        if len(parts) != 3:
             continue
-        raw_date, subject = line.split("\t", 1)
-        raw_date, subject = raw_date.strip(), subject.strip()
+        commit, raw_date, subject = (part.strip() for part in parts)
         if not DATE_RE.match(raw_date) or not subject:
+            continue
+        if commit in skip_hashes:
             continue
         if subject.startswith(SKIP_PREFIXES):
             continue
