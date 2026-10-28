@@ -6,9 +6,17 @@
 <title>{{ page.title }} — {{ site.title }}. {{ site.subtitle }}</title>
 <meta name="description" content="{{ page.description }}">
 <meta property="og:type" content="website">
+<meta property="og:site_name" content="{{ site.title }}. {{ site.subtitle }}">
+<meta property="og:locale" content="ru_RU">
 <meta property="og:title" content="{{ page.title }} — {{ site.title }}">
 <meta property="og:description" content="{{ page.description }}">
-<meta property="og:image" content="{{ site.base_url }}assets/img/map-political-900.png">
+<meta property="og:image" content="{{ site.base_url }}assets/img/og.jpg">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="{{ page.title }} — {{ site.title }}">
+<meta name="twitter:description" content="{{ page.description }}">
+<meta name="twitter:image" content="{{ site.base_url }}assets/img/og.jpg">
 <meta name="theme-color" content="#3f4137">
 {% if page.file %}<link rel="canonical" href="{{ site.base_url }}{{ page.file }}">{% endif %}
 <script type="application/ld+json">{{ jsonld | safe }}</script>

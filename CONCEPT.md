@@ -467,7 +467,7 @@ python scripts/validate.py && python build.py && python scripts/validate.py --di
 ### SEO
 
 - `title` и `description` у каждой страницы;
-- Open Graph-разметка;
+- Open Graph и Twitter Card с изображением 1200×630 (`assets/img/og.jpg`);
 - `sitemap.xml`, `robots.txt`;
 - ЧПУ-имена файлов, стабильные якоря (`#turn-2`, `#map-political-900`);
 - осмысленный `404.html`;
@@ -476,7 +476,7 @@ python scripts/validate.py && python build.py && python scripts/validate.py --di
 ### Производительность
 
 - нет веб-шрифтов и внешних библиотек;
-- CSS ≈ 33 КБ, JS ≈ 8 КБ, изображения отдаются как есть;
+- CSS ≈ 35 КБ, JS ≈ 10 КБ, изображения отдаются как есть;
 - `loading="lazy"` для карт и галереи;
 - статика отдаётся с CDN GitHub Pages;
 - сборка — доли секунды, деплой — около минуты.
