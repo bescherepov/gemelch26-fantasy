@@ -1,0 +1,49 @@
+{
+  "intro": "Карты и таблицы партии. Все изображения лежат в assets/img и описаны в data/maps.json — новые карты добавляются одной записью.",
+  "categories": [
+    { "id": "political", "title": "Политические" },
+    { "id": "seating", "title": "Рассадка" }
+  ],
+  "maps": [
+    {
+      "id": "political-900",
+      "category": "political",
+      "title": "Политическая карта на 900 год",
+      "caption": "Регионы и локации континента к началу партии.",
+      "file": "assets/img/map-political-900.png",
+      "source_file": "Obschaya_karta_nazvania_lokatsiy.png",
+      "width": 804,
+      "height": 1003
+    },
+    {
+      "id": "start-900",
+      "category": "political",
+      "title": "Политическая карта на старте",
+      "caption": "Государства на 900 год с номерами фракций.",
+      "file": "assets/img/map-start-900.png",
+      "source_file": "Start_1.png",
+      "width": 804,
+      "height": 1003
+    },
+    {
+      "id": "seating-900",
+      "category": "seating",
+      "title": "Рассадка на старте",
+      "caption": "23 государства и их участники на карте 900 года.",
+      "file": "assets/img/map-seating-900.png",
+      "source_file": "Startovaya_rassadka.png",
+      "width": 804,
+      "height": 1003
+    },
+    {
+      "id": "political-905",
+      "category": "political",
+      "title": "Политическая карта после 2-го хода",
+      "caption": "Мир в 905 году: границы, города и морские зоны.",
+      "file": "assets/img/map-political-905.png",
+      "source_file": "2khod.png",
+      "width": 804,
+      "height": 1003
+    }
+  ]
+}

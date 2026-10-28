@@ -1,0 +1,32 @@
+<header class="page-head page-head--tight">
+  <p class="kicker">Атлас</p>
+  <h1>Карты</h1>
+  <p class="lead">{{ maps.intro }}</p>
+</header>
+
+<div class="filters" data-map-filters>
+  <span class="filters__label">Раздел:</span>
+  <div class="filters__list">
+    <button class="chip is-active" type="button" data-map-filter="all">Все</button>
+    {% for category in maps.categories %}
+    <button class="chip" type="button" data-map-filter="{{ category.id }}">{{ category.title }}</button>
+    {% endfor %}
+  </div>
+</div>
+
+<div class="gallery">
+  {% for m in maps.maps %}
+  <figure class="shot" id="map-{{ m.id }}" data-category="{{ m.category }}">
+    <a href="{{ m.file }}" target="_blank" rel="noopener">
+      <img src="{{ m.file }}" alt="{{ m.title }}" loading="lazy" width="{{ m.width }}" height="{{ m.height }}">
+    </a>
+    <figcaption>
+      <h2>{{ m.title }}</h2>
+      <p>{{ m.caption }}</p>
+      <p class="shot__meta">Файл: <code>{{ m.file }}</code></p>
+    </figcaption>
+  </figure>
+  {% endfor %}
+</div>
+
+<p class="page-foot-note">Изображения открываются в полном размере. Новые карты добавляются записью в <code>data/maps.json</code> и файлом в <code>assets/img</code>.</p>

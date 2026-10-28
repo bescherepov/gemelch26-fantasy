@@ -1,0 +1,40 @@
+{
+  "links": [
+    {
+      "id": "chronicle",
+      "title": "Хроника партии на DM.AM",
+      "url": "https://ru.l.dm.am/Session.aspx?module=13607&room=90813",
+      "description": "Первоисточник: ходы, карты и комментарии мастера."
+    },
+    {
+      "id": "hegemony",
+      "title": "Что такое «Гегемония»",
+      "url": "https://ru.l.dm.am/Session.aspx?module=13607&room=88964",
+      "description": "Обзор игровой системы, по которой идёт партия."
+    },
+    {
+      "id": "balance",
+      "title": "Как играть: разбор игрового баланса",
+      "url": "https://ru.l.dm.am/Session.aspx?module=13607&room=89009",
+      "description": "Мастерский разбор механик и баланса «Гегемонии»."
+    },
+    {
+      "id": "module",
+      "title": "Модуль игры на DM.AM",
+      "url": "https://ru.l.dm.am/ModuleInfo.aspx?module=13607",
+      "description": "Описание модуля и другие партии по этой системе."
+    },
+    {
+      "id": "previous",
+      "title": "Сайт предыдущей партии",
+      "url": "https://allaindm.github.io/dipaeu26/",
+      "description": "«Европа 1150» — прошлая партия и источник вдохновения для этого сайта."
+    },
+    {
+      "id": "dmam",
+      "title": "DM.AM",
+      "url": "https://ru.l.dm.am/",
+      "description": "Площадка форумных ролевых игр."
+    }
+  ]
+}

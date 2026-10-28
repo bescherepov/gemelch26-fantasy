@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="{{ site.lang }}">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ page.title }} — {{ site.title }}. {{ site.subtitle }}</title>
+<meta name="description" content="{{ page.description }}">
+<meta property="og:type" content="website">
+<meta property="og:title" content="{{ page.title }} — {{ site.title }}">
+<meta property="og:description" content="{{ page.description }}">
+<meta property="og:image" content="{{ site.base_url }}assets/img/map-political-900.png">
+<meta name="theme-color" content="#3f4137">
+{% if page.file %}<link rel="canonical" href="{{ site.base_url }}{{ page.file }}">{% endif %}
+<script type="application/ld+json">{{ jsonld | safe }}</script>
+<script>document.documentElement.classList.add("js");</script>
+<link rel="icon" href="assets/img/favicon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="assets/css/style.css">
+</head>
+<body data-page="{{ page.id }}">
+<a class="skip-link" href="#main">Перейти к содержимому</a>
+<header class="topbar">
+  <div class="topbar__inner">
+    <a class="brand" href="index.html">
+      <span class="brand__title">{{ site.title }}</span>
+      <span class="brand__sub">{{ site.subtitle }}</span>
+    </a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="mainmenu">
+      <span class="nav-toggle__bar"></span>
+      <span class="sr-only">Меню</span>
+    </button>
+    <nav class="mainmenu" id="mainmenu" aria-label="Основная навигация">
+      <ul>
+      {% for item in site.menu %}
+        <li><a href="{{ item.url }}"{% if item.id == page.id %} class="is-active" aria-current="page"{% endif %}>{{ item.title }}</a></li>
+      {% endfor %}
+      </ul>
+    </nav>
+  </div>
+</header>
+<main id="main" class="page">
+{{ content | safe }}
+</main>
+<footer class="footer">
+  <div class="footer__inner">
+    <div>
+      <p class="footer__brand">{{ site.title }}. {{ site.subtitle }}</p>
+      <p class="footer__note">Сайт-хроника партии «{{ site.system }}». Данные — в <code>data/*.json</code>, сборка — <code>build.py</code>, публикация — GitHub Actions.</p>
+    </div>
+    <div class="footer__meta">
+      <p><a href="{{ site.source_url }}" rel="noopener">Первоисточник на DM.AM</a></p>
+      <p><a href="links.html">Все ссылки</a> · <a href="log.html">История изменений</a></p>
+      <p class="muted">Обновлено {{ build.date_ru }}</p>
+    </div>
+  </div>
+</footer>
+<script src="assets/js/site.js" defer></script>
+</body>
+</html>

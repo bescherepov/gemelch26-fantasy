@@ -1,0 +1,29 @@
+<header class="page-head page-head--tight">
+  <p class="kicker">Источники</p>
+  <h1>Ссылки</h1>
+  <p class="lead">Первоисточники партии и материалы по системе. Сайт — спутник хроники, а не её замена.</p>
+</header>
+
+<div class="links">
+  {% for link in links.links %}
+  <article class="link-card">
+    <h2><a href="{{ link.url }}" rel="noopener">{{ link.title }}</a></h2>
+    <p>{{ link.description }}</p>
+    <p class="link-card__url">{{ link.url }}</p>
+  </article>
+  {% endfor %}
+</div>
+
+<section class="section section--band">
+  <div class="split">
+    <div>
+      <p class="kicker">Данные</p>
+      <h2>Откуда берётся хроника</h2>
+      <p>Основа сайта — материалы мастера: Setting (мир и народы), тексты ходов и карты партии. Они лежат в <code>sources/</code>, а их структурированная версия — в <code>data/</code>.</p>
+    </div>
+    <div>
+      <p class="kicker">Сборка</p>
+      <p>Каждый коммит в основную ветку запускает GitHub Actions: проверка данных, сборка и публикация на GitHub Pages.</p>
+    </div>
+  </div>
+</section>

@@ -1,0 +1,121 @@
+<section class="hero">
+  <div class="hero__media" aria-hidden="true">
+    <img src="{{ hero_map.file }}" alt="">
+  </div>
+  <div class="hero__body">
+    <p class="kicker">{{ site.system }} · {{ site.period.from }}–{{ site.period.to }} годы</p>
+    <h1 class="hero__title">{{ site.title }}</h1>
+    <p class="hero__sub">{{ site.subtitle }}</p>
+    <p class="hero__lead">{{ site.tagline }}</p>
+    <ul class="hero__facts">
+      {% for fact in world.facts %}
+      <li><span>{{ fact.value }}</span>{{ fact.label }}</li>
+      {% endfor %}
+    </ul>
+    <p class="hero__actions">
+      <a class="btn btn--solid" href="turns.html#turn-{{ latest.number }}">Читать хронику</a>
+      <a class="btn btn--ghost" href="world.html">О мире</a>
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <header class="section__head">
+    <div>
+      <p class="kicker">Последний ход</p>
+      <h2>{{ latest.title }} <span class="section__year">{{ latest.year }}</span></h2>
+    </div>
+    <a class="link-more" href="turns.html#turn-{{ latest.number }}">Все события хода →</a>
+  </header>
+  <p class="section__lead">{{ latest.lead }}</p>
+  <div class="cards">
+    {% for e in latest_preview %}
+    <article class="card event-card">
+      <span class="badge badge--{{ e.type }}">{{ e.type_label }}</span>
+      <h3>{{ e.title }}</h3>
+      <p>{{ e.text }}</p>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="section section--band">
+  <header class="section__head">
+    <div>
+      <p class="kicker">Хроника</p>
+      <h2>Пять лет за ход</h2>
+    </div>
+    <span class="section__note">{{ stats.turns }} хода · {{ stats.events }} событий</span>
+  </header>
+  <ol class="strip">
+    {% for t in turns %}
+    <li>
+      <a href="turns.html#turn-{{ t.number }}">
+        <span class="strip__year">{{ t.year }}</span>
+        <strong>{{ t.title }}</strong>
+        <span class="strip__meta">Ход {{ t.number }} · {{ t.events | length }} событий</span>
+      </a>
+    </li>
+    {% endfor %}
+  </ol>
+</section>
+
+<section class="section">
+  <header class="section__head">
+    <div>
+      <p class="kicker">Народы</p>
+      <h2>Голоса континента</h2>
+    </div>
+    <a class="link-more" href="ethnoses.html">Все этносы →</a>
+  </header>
+  <ul class="people">
+    {% for e in ethnoses.ethnoses %}
+    <li style="--ethnos: {{ e.color }}">
+      <a href="ethnoses.html#{{ e.id }}">
+        <span class="people__dot"></span>
+        <span class="people__name">{{ e.name }}</span>
+        <em>{{ e.epithet }}</em>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+
+<section class="section section--dark">
+  <div class="split">
+    <div>
+      <p class="kicker">Как устроен сайт</p>
+      <h2>Один источник — все страницы</h2>
+      <p>Мир, народы, история и ходы описаны в <code>data/*.json</code>. Страницы собираются из этих файлов: одно событие живёт в одном месте и не дублируется в вёрстке.</p>
+      <p><a class="btn btn--ghost" href="log.html">История изменений</a></p>
+    </div>
+    <ol class="steps">
+      <li><span>01</span><div><h3>Данные</h3><p>Ход, народ или карта описываются одной записью в JSON.</p></div></li>
+      <li><span>02</span><div><h3>Сборка</h3><p><code>build.py</code> проверяет данные и рендерит страницы.</p></div></li>
+      <li><span>03</span><div><h3>Публикация</h3><p>GitHub Actions собирает сайт и выкладывает его на GitHub Pages.</p></div></li>
+    </ol>
+  </div>
+</section>
+
+<section class="section">
+  <header class="section__head">
+    <div>
+      <p class="kicker">Атлас</p>
+      <h2>Карты партии</h2>
+    </div>
+    <a class="link-more" href="maps.html">Все карты →</a>
+  </header>
+  <div class="gallery gallery--preview">
+    {% for m in preview_maps %}
+    <figure class="shot">
+      <a href="{{ m.file }}" target="_blank" rel="noopener">
+        <img src="{{ m.file }}" alt="{{ m.title }}" loading="lazy" width="{{ m.width }}" height="{{ m.height }}">
+      </a>
+      <figcaption>
+        <h3>{{ m.title }}</h3>
+        <p>{{ m.caption }}</p>
+      </figcaption>
+    </figure>
+    {% endfor %}
+  </div>
+</section>

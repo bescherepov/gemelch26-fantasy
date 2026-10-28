@@ -1,0 +1,98 @@
+<header class="page-head">
+  <p class="kicker">Мир</p>
+  <h1>{{ world.title }}</h1>
+  <p class="lead">{{ world.lead }}</p>
+</header>
+
+<section class="prose">
+  {% for paragraph in world.intro %}
+  <p>{{ paragraph }}</p>
+  {% endfor %}
+</section>
+
+<section class="section">
+  <header class="section__head">
+    <div>
+      <p class="kicker">География</p>
+      <h2>Земли и рубежи</h2>
+    </div>
+    <a class="link-more" href="maps.html#map-political-900">Карта мира →</a>
+  </header>
+  <div class="regions">
+    {% for region in world.regions %}
+    <article class="region">
+      <h3>{{ region.title }}</h3>
+      <p>{{ region.text }}</p>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="section section--band">
+  <header class="section__head">
+    <div>
+      <p class="kicker">Право</p>
+      <h2>Законы Айзенвелла</h2>
+    </div>
+  </header>
+  <p class="section__lead">{{ world.laws_intro }}</p>
+  <div class="laws">
+    {% for law in world.laws %}
+    <article class="law">
+      <h3>{{ law.title }}</h3>
+      <p>{{ law.text }}</p>
+      <p class="law__effect"><span>Игровой эффект</span>{{ law.effect }}</p>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="section">
+  <header class="section__head">
+    <div>
+      <p class="kicker">Летопись</p>
+      <h2>{{ history.title }}, 400–900</h2>
+    </div>
+  </header>
+  <p class="section__lead">{{ history.lead }}</p>
+
+  <ol class="timeline">
+    {% for epoch in history.epochs %}
+    <li class="epoch" id="{{ epoch.id }}">
+      <div class="epoch__marker" aria-hidden="true"><span>{{ epoch.number }}</span></div>
+      <div class="epoch__body">
+        <p class="epoch__years">{{ epoch.years }}</p>
+        <h3>{{ epoch.title }}</h3>
+        {% for block in epoch.blocks %}
+        <div class="epoch__block">
+          <h4>{{ block.title }}</h4>
+          <p>{{ block.text }}</p>
+        </div>
+        {% endfor %}
+        {% if epoch.battle %}
+        <aside class="battle">
+          <p class="battle__kicker">Битва · {{ epoch.battle.year }}</p>
+          <h4>{{ epoch.battle.name }}</h4>
+          <p>{{ epoch.battle.text }}</p>
+          <p class="battle__result"><span>Итог.</span> {{ epoch.battle.result }}</p>
+        </aside>
+        {% endif %}
+        {% if epoch.heroes %}
+        <div class="heroes">
+          {% for hero in epoch.heroes %}
+          <article class="hero-card">
+            <p class="hero-card__people">{{ hero.people }}</p>
+            <h4>{{ hero.name }}</h4>
+            <p>{{ hero.text }}</p>
+          </article>
+          {% endfor %}
+        </div>
+        {% endif %}
+        {% if epoch.outro %}
+        <p class="epoch__outro">{{ epoch.outro }}</p>
+        {% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+</section>

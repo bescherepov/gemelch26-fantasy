@@ -1,0 +1,25 @@
+<header class="page-head">
+  <p class="kicker">Этносы</p>
+  <h1>Народы континента</h1>
+  <p class="lead">{{ ethnoses.intro }}</p>
+</header>
+
+<div class="ethnos-grid">
+  {% for e in ethnoses.ethnoses %}
+  <article class="ethnos" id="{{ e.id }}" style="--ethnos: {{ e.color }}">
+    <header class="ethnos__head">
+      <span class="ethnos__swatch" aria-hidden="true"></span>
+      <div>
+        <h2>{{ e.name }}</h2>
+        <p class="ethnos__epithet">{{ e.epithet }}</p>
+      </div>
+    </header>
+    <p class="ethnos__analog"><span>Аналог в РС</span>{{ e.analog }}</p>
+    <p class="ethnos__text"><strong>География.</strong> {{ e.geography }}</p>
+    <p class="ethnos__text">{{ e.description }}</p>
+    {% if e.status %}
+    <p class="ethnos__status"><span>{{ e.status_label }}</span>{{ e.status }}</p>
+    {% endif %}
+  </article>
+  {% endfor %}
+</div>

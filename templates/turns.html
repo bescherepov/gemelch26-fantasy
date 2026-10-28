@@ -1,0 +1,95 @@
+<header class="page-head page-head--tight">
+  <p class="kicker">Хроника</p>
+  <h1>Ходы</h1>
+  <p class="lead">Партия идёт по пять лет за ход. Ниже — события каждого хода: войны, союзы, династии, религии и катастрофы.</p>
+</header>
+
+<nav class="turn-tabs" aria-label="Выбор хода">
+  {% for t in turns %}
+  <a class="turn-tab{% if loop.last %} is-active{% endif %}" href="#turn-{{ t.number }}" data-turn-tab="{{ t.number }}">
+    <span class="turn-tab__num">Ход {{ t.number }}</span>
+    <span class="turn-tab__year">{{ t.year }}</span>
+    <span class="turn-tab__title">{{ t.title }}</span>
+  </a>
+  {% endfor %}
+</nav>
+
+<div class="search" data-search hidden>
+  <label class="sr-only" for="event-search">Поиск по хронике</label>
+  <input class="search__input" id="event-search" type="search" placeholder="Поиск по всей хронике: имя, город, битва…" autocomplete="off" spellcheck="false" data-search-input>
+  <span class="search__hint" data-search-hint role="status" aria-live="polite"></span>
+</div>
+
+<div class="filters" data-filters hidden>
+  <span class="filters__label">Фильтр:</span>
+  <div class="filters__list" data-filter-list></div>
+</div>
+
+{% for t in turns %}
+<article class="turn{% if not loop.last %} is-hidden{% endif %}" id="turn-{{ t.number }}" data-turn="{{ t.number }}">
+  <header class="turn__head">
+    <p class="turn__kicker">{{ t.year }} год · ход {{ t.number }}</p>
+    <h2 class="turn__title">{{ t.title }}</h2>
+    <p class="turn__lead">{{ t.lead }}</p>
+  </header>
+
+  <div class="turn__layout">
+    {% if t.map %}
+    <figure class="turn__map">
+      <a href="{{ t.map.image }}" target="_blank" rel="noopener">
+        <img src="{{ t.map.image }}" alt="{{ t.map.caption }}" loading="lazy">
+      </a>
+      <figcaption>{{ t.map.caption }}</figcaption>
+    </figure>
+    {% endif %}
+
+    <ol class="events">
+      {% for e in t.events %}
+      <li class="event" data-type="{{ e.type }}" id="turn-{{ t.number }}-{{ loop.index }}">
+        <span class="badge badge--{{ e.type }}">{{ e.type_label }}</span>
+        <div class="event__body">
+          <h3>{{ e.title }}</h3>
+          <p>{{ e.text }}</p>
+        </div>
+      </li>
+      {% endfor %}
+    </ol>
+  </div>
+
+  {% if t.note %}
+  <p class="turn__note">{{ t.note }}</p>
+  {% endif %}
+
+  <nav class="turn-nav" aria-label="Соседние ходы">
+    {% if t.prev %}
+    <a class="turn-nav__link turn-nav__link--prev" href="#turn-{{ t.prev.number }}">
+      <span class="turn-nav__dir">← Предыдущий ход</span>
+      <strong>{{ t.prev.year }} · {{ t.prev.title }}</strong>
+    </a>
+    {% endif %}
+    {% if t.next %}
+    <a class="turn-nav__link turn-nav__link--next" href="#turn-{{ t.next.number }}">
+      <span class="turn-nav__dir">Следующий ход →</span>
+      <strong>{{ t.next.year }} · {{ t.next.title }}</strong>
+    </a>
+    {% endif %}
+  </nav>
+</article>
+{% endfor %}
+
+<section class="section section--band">
+  <p class="kicker">Итоги</p>
+  <h2>Хроника в цифрах</h2>
+  <p class="section__lead">{{ stats.events }} событий в хронике {{ stats.years }} годов. Распределение по типам собирается из тех же данных, что и страницы ходов, — вручную эти числа не ведутся.</p>
+  <ul class="bars">
+    {% for item in type_stats %}
+    <li>
+      <span class="bars__label">{{ item.label }}</span>
+      <span class="bars__track"><span class="bars__fill" style="width: {{ item.width }}%"></span></span>
+      <span class="bars__value">{{ item.count }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+</section>
+
+<p class="page-foot-note">Полные тексты ходов и карты публикует мастер в <a href="{{ site.source_url }}" rel="noopener">хронике на DM.AM</a>.</p>

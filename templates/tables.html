@@ -1,0 +1,34 @@
+<header class="page-head page-head--tight">
+  <p class="kicker">Справочник</p>
+  <h1>Таблицы</h1>
+  <p class="lead">{{ tables.intro }}</p>
+</header>
+
+<div class="tables">
+  {% for table in tables.tables %}
+  <figure class="shot shot--table" id="table-{{ table.id }}">
+    <a href="{{ table.file }}" target="_blank" rel="noopener">
+      <img src="{{ table.file }}" alt="{{ table.title }}" loading="lazy">
+    </a>
+    <figcaption>
+      <h2>{{ table.title }}</h2>
+      <p>{{ table.caption }}</p>
+      {% if table.note %}<p class="shot__meta">{{ table.note }}</p>{% endif %}
+    </figcaption>
+  </figure>
+  {% endfor %}
+</div>
+
+<section class="section section--band">
+  <div class="split">
+    <div>
+      <p class="kicker">Как это работает</p>
+      <h2>Таблица — тоже данные</h2>
+      <p>Изображение таблицы описано в <code>data/tables.json</code> рядом с картами. Когда мастер присылает новую таблицу, достаточно положить файл в <code>assets/img</code> и добавить запись — страница соберётся сама.</p>
+    </div>
+    <div>
+      <p class="kicker">Нужны правила?</p>
+      <p>Полные правила системы, разбор баланса и другие материалы — в разделе <a href="links.html">«Ссылки»</a>.</p>
+    </div>
+  </div>
+</section>

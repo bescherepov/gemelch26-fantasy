@@ -1,0 +1,28 @@
+<header class="page-head page-head--tight">
+  <p class="kicker">История</p>
+  <h1>Лог</h1>
+  <p class="lead">Что и когда менялось в хронике. Записи ведутся по игровым данным: ходы, карты, таблицы, правила.</p>
+</header>
+
+<ol class="log">
+  {% for entry in changelog.entries %}
+  <li>
+    <time datetime="{{ entry.date }}">{{ entry.date | date_ru }}</time>
+    <span>{{ entry.text }}</span>
+  </li>
+  {% endfor %}
+</ol>
+
+<section class="section section--band">
+  <div class="split">
+    <div>
+      <p class="kicker">Автоматически</p>
+      <h2>Лог собирается из истории</h2>
+      <p>При сборке сайта GitHub Actions дополняет этот список коммитами, которые меняли <code>data/</code>. Поэтому записи не нужно дублировать вручную — достаточно осмысленного сообщения коммита.</p>
+    </div>
+    <div>
+      <p class="kicker">Формат</p>
+      <p>Дата — <code>ДД.ММ.ГГГГ</code>, затем короткое описание игрового изменения на русском. Технические правки вёрстки в лог не попадают.</p>
+    </div>
+  </div>
+</section>

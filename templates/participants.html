@@ -1,0 +1,28 @@
+<header class="page-head page-head--tight">
+  <p class="kicker">Стол</p>
+  <h1>{{ participants.title }}</h1>
+  <p class="lead">{{ participants.intro }}</p>
+</header>
+
+<ul class="stat-row">
+  {% for fact in participants.facts %}
+  <li><span>{{ fact.value }}</span>{{ fact.label }}</li>
+  {% endfor %}
+</ul>
+
+<figure class="shot shot--wide">
+  <a href="{{ participants.image }}" target="_blank" rel="noopener">
+    <img src="{{ participants.image }}" alt="{{ participants.image_caption }}" loading="lazy">
+  </a>
+  <figcaption>
+    <p>{{ participants.image_caption }}</p>
+  </figcaption>
+</figure>
+
+<section class="section">
+  <div class="notes">
+    {% for note in participants.notes %}
+    <p>{{ note }}</p>
+    {% endfor %}
+  </div>
+</section>

@@ -1,0 +1,22 @@
+{
+  "title": "Расфадаль",
+  "subtitle": "Мир. Хроника",
+  "tagline": "Девять народов, расколотые королевства и вековая вражда. Хроника партии «Гегемония» с 900 года.",
+  "description": "Сайт-хроника мира Расфадаль: партия «Гегемония», 900–910 годы. Мир, народы, история и ходы. Данные собираются из единого источника и публикуются автоматически через GitHub Actions.",
+  "base_url": "https://bescherepov.github.io/gemelch26-fantasy/",
+  "lang": "ru",
+  "system": "Гегемония",
+  "gm": "LeonardoAngelo",
+  "source_url": "https://ru.l.dm.am/Session.aspx?module=13607&room=90813",
+  "period": { "from": 900, "to": 910 },
+  "menu": [
+    { "id": "world", "title": "Мир", "url": "world.html" },
+    { "id": "ethnoses", "title": "Этносы", "url": "ethnoses.html" },
+    { "id": "turns", "title": "Ходы", "url": "turns.html" },
+    { "id": "maps", "title": "Карты", "url": "maps.html" },
+    { "id": "tables", "title": "Таблицы", "url": "tables.html" },
+    { "id": "participants", "title": "Рассадка", "url": "participants.html" },
+    { "id": "log", "title": "Лог", "url": "log.html" },
+    { "id": "links", "title": "Ссылки", "url": "links.html" }
+  ]
+}
