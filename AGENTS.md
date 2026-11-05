@@ -86,7 +86,7 @@ gemelch26-fantasy/
 | `ethnoses.json` | народы | `ethnoses[].id/name/color/epithet/analog/geography/description` |
 | `turns/NNN.json` | ход | `number`, `year`, `title`, `lead`, `events[]` |
 | `maps.json` | карты | `categories[]`, `maps[].id/category/title/caption/file` |
-| `tables.json` | таблицы | `tables[].id/title/file` |
+| `tables.json` | таблицы | `tables[].id/title/caption` + `file` либо `columns[]`/`rows[][]` |
 | `buildings.json` | постройки | `buildings[].id/name/category/location`, `changes[].id` |
 | `participants.json` | рассадка | `title`, `intro`, `count`, `image`, `notes[]` |
 | `links.json` | ссылки | `links[].id/title/url/description` |
@@ -134,6 +134,8 @@ gemelch26-fantasy/
 - `id` уникальны (народы, эпохи, карты, таблицы, ссылки);
 - цвета в формате `#rrggbb`;
 - все упомянутые изображения существуют;
+- у таблиц есть подписи, а в таблицах из чисел число ячеек в строке совпадает
+  с числом колонок;
 - категории карт объявлены;
 - у построек известная категория, а местные правила ссылаются на существующие
   постройки и наоборот;
@@ -160,6 +162,13 @@ gemelch26-fantasy/
 
 Запись в `data/maps.json` или `data/tables.json` + файл в `assets/img`.
 Страницы, галерея и превью на главной обновятся автоматически.
+
+### Добавить таблицу из чисел
+
+Запись в `data/tables.json` с `columns[]` (подписи колонок) и `rows[][]`
+(строки той же длины), без файла: страница «Таблицы» соберёт `<table>` сама,
+место в рейтинге выводится по порядку строк. Валидатор проверит, что колонки
+и ячейки заполнены, а число ячеек в каждой строке совпадает.
 
 ### Добавить постройку
 

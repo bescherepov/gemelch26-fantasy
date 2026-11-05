@@ -116,7 +116,8 @@ def check_assets(turns: list[dict], maps: dict, tables: dict) -> None:
     for item in maps["maps"]:
         referenced.add(item["file"])
     for item in tables["tables"]:
-        referenced.add(item["file"])
+        if item.get("file"):
+            referenced.add(item["file"])
     referenced.add("assets/img/favicon.svg")
     missing = [path for path in sorted(referenced) if not (ROOT / path).is_file()]
     if missing:

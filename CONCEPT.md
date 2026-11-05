@@ -126,7 +126,7 @@ data/*.json ──► validate ──► build.py ──► dist/ ──► GitH
 | `ethnoses.json` | девять народов | `id`, `color`, `epithet`, `analog`, `geography`, `description`, `status` |
 | `turns/NNN.json` | один ход: год, название, карта, события | `number`, `year`, `title`, `lead`, `map`, `events[]` |
 | `maps.json` | каталог карт и разделов | `categories[]`, `maps[].file` |
-| `tables.json` | игровые таблицы | `tables[].file` |
+| `tables.json` | игровые таблицы | `tables[].id/title/caption` + `file` либо `columns[]`/`rows[][]` |
 | `buildings.json` | постройки и местные правила | `buildings[].id`, `changes[].id` |
 | `participants.json` | рассадка | `count`, `image`, `notes[]` |
 | `links.json` | внешние ссылки | `links[].url` |

@@ -99,6 +99,31 @@ class BuildTest(unittest.TestCase):
                 for building_id in change["buildings"]:
                     self.assertIn(f'id="b-{building_id}"', page)
 
+    def test_tables_render_images_and_numbers(self):
+        import json
+
+        data = json.loads((ROOT / "data/tables.json").read_text(encoding="utf-8"))
+        page = (DIST / "tables.html").read_text(encoding="utf-8")
+        self.assertTrue(
+            any(item.get("rows") for item in data["tables"]),
+            "нет ни одной таблицы, собранной из чисел",
+        )
+        for table in data["tables"]:
+            with self.subTest(table=table["id"]):
+                marker = f'id="table-{table["id"]}"'
+                self.assertIn(marker, page)
+                block = page[page.index(marker):]
+                block = block[: block.index("</figure>")]
+                if table.get("file"):
+                    self.assertIn("<img", block)
+                    continue
+                self.assertIn("<table>", block)
+                for column in table["columns"]:
+                    self.assertIn(column, block)
+                for row in table["rows"]:
+                    for cell in row:
+                        self.assertIn(cell, block)
+
     def test_validate_and_links(self):
         result = run("scripts/validate.py", "--dist")
         self.assertEqual(result.returncode, 0, result.stderr)

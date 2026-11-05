@@ -6,15 +6,37 @@
 
 <div class="tables">
   {% for table in tables.tables %}
-  <figure class="shot shot--table" id="table-{{ table.id }}">
+  <figure class="shot {% if table.file %}shot--table{% else %}shot--data{% endif %}" id="table-{{ table.id }}">
+    {% if table.file %}
     <a href="{{ table.file }}" target="_blank" rel="noopener">
       <img src="{{ table.file }}" alt="{{ table.title }}" loading="lazy">
     </a>
+    {% endif %}
     <figcaption>
       <h2>{{ table.title }}</h2>
       <p>{{ table.caption }}</p>
       {% if table.note %}<p class="shot__meta">{{ table.note }}</p>{% endif %}
     </figcaption>
+    {% if table.rows %}
+    <div class="rank-table">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">№</th>
+            {% for column in table.columns %}<th scope="col">{{ column }}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in table.rows %}
+          <tr>
+            <th scope="row">{{ loop.index }}</th>
+            {% for cell in row %}<td>{{ cell }}</td>{% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
   </figure>
   {% endfor %}
 </div>
@@ -24,7 +46,7 @@
     <div>
       <p class="kicker">Как это работает</p>
       <h2>Таблица — тоже данные</h2>
-      <p>Изображение таблицы описано в <code>data/tables.json</code> рядом с картами. Когда мастер присылает новую таблицу, достаточно положить файл в <code>assets/img</code> и добавить запись — страница соберётся сама.</p>
+      <p>Картинка таблицы и её числа описаны в <code>data/tables.json</code> рядом с картами. Когда мастер присылает новую таблицу, достаточно положить файл в <code>assets/img</code> или вписать строки в JSON — страница соберётся сама.</p>
     </div>
     <div>
       <p class="kicker">Нужны правила?</p>

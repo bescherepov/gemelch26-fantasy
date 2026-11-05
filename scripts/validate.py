@@ -247,15 +247,43 @@ def check_gallery() -> tuple[dict | None, dict | None]:
         seen = set()
         for index, item in enumerate(tables.get("tables", [])):
             where = f"tables.json → tables[{index}]"
-            for key in ("id", "title", "file"):
+            for key in ("id", "title", "caption"):
                 text(item, key, where)
             if item.get("id") in seen:
                 err(f"{where}: повторяющийся id «{item.get('id')}»")
             seen.add(item.get("id"))
             if item.get("file") and not (ROOT / item["file"]).is_file():
                 err(f"{where}: нет файла {item.get('file')}")
+            check_table_part(item, where)
 
     return maps, tables
+
+
+def check_table_part(item: dict, where: str) -> None:
+    """Таблица без картинки: колонки и строки с одинаковым числом ячеек."""
+    if item.get("file"):
+        if item.get("rows") or item.get("columns"):
+            err(f"{where}: таблица либо файл, либо строки — не оба сразу")
+        return
+
+    columns = item.get("columns")
+    rows = item.get("rows")
+    if not isinstance(columns, list) or not columns:
+        err(f"{where}: нужен файл таблицы или непустые columns")
+        return
+    for column in columns:
+        if not isinstance(column, str) or not column.strip():
+            err(f"{where}: columns должен состоять из непустых строк")
+    if not isinstance(rows, list) or not rows:
+        err(f"{where}: нужен непустой rows")
+        return
+    for row_index, row in enumerate(rows):
+        if not isinstance(row, list) or len(row) != len(columns):
+            err(f"{where} → rows[{row_index}]: ожидалось {len(columns)} ячеек")
+            continue
+        for cell in row:
+            if not isinstance(cell, str) or not cell.strip():
+                err(f"{where} → rows[{row_index}]: пустая ячейка")
 
 
 def check_buildings() -> None:
