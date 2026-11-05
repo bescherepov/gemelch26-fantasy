@@ -54,6 +54,16 @@
       "source_file": "4khod_karta.png",
       "width": 804,
       "height": 1003
+    },
+    {
+      "id": "political-930",
+      "category": "political",
+      "title": "Политическая карта после 7-го хода",
+      "caption": "Мир в 930 году: границы государств и городов после 7-го хода.",
+      "file": "assets/img/map-political-930.png",
+      "source_file": "7khod_karta.png",
+      "width": 804,
+      "height": 1082
     }
   ]
 }

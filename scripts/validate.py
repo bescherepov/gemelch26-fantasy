@@ -214,8 +214,16 @@ def check_turns() -> list[dict]:
             if not (ROOT / image).is_file():
                 err(f"{label}: нет изображения карты {image}")
 
-    if numbers != list(range(1, len(numbers) + 1)):
-        err(f"turns: номера ходов должны идти подряд с 1, получено {numbers}")
+    if numbers and numbers[0] != 1:
+        err(f"turns: первый ход должен иметь номер 1, получено {numbers[0]}")
+    if numbers != sorted(set(numbers)):
+        err(f"turns: номера ходов должны возрастать без повторов, получено {numbers}")
+    # Пропуск хода — не ошибка данных, но о нём нужно сказать вслух:
+    # перенести в JSON успевают не все ходы, а нумерация приходит из источника.
+    gaps = sorted(set(range(1, max(numbers) + 1)) - set(numbers)) if numbers else []
+    if gaps:
+        missing = ", ".join(str(number) for number in gaps)
+        print(f"Внимание: ходы {missing} в data/turns отсутствуют — хроника идёт с пропуском")
     if years != sorted(years):
         err(f"turns: годы ходов должны возрастать, получено {years}")
     if len(set(years)) != len(years):

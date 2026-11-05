@@ -221,7 +221,7 @@ def build() -> None:
     )
 
     hero_map = next(
-        (item for item in maps["maps"] if item["id"] == "political-915"),
+        (item for item in maps["maps"] if item["id"] == "political-930"),
         maps["maps"][0],
     )
     preview_maps = maps["maps"][:3]

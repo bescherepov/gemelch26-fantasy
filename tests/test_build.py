@@ -124,6 +124,36 @@ class BuildTest(unittest.TestCase):
                     for cell in row:
                         self.assertIn(cell, block)
 
+    def test_turn_sections_render_for_every_turn(self):
+        import json
+
+        page = (DIST / "turns.html").read_text(encoding="utf-8")
+        for path in sorted((ROOT / "data/turns").glob("*.json")):
+            number = json.loads(path.read_text(encoding="utf-8"))["number"]
+            with self.subTest(turn=path.name, number=number):
+                self.assertIn(f'id="turn-{number}"', page)
+
+    def test_turn_gaps_are_warned_not_fatal(self):
+        """Пропуск в нумерации ходов — предупреждение, а не ошибка данных.
+
+        Перенести в JSON успевают не все ходы, а номера приходят из источника,
+        поэтому валидатор сообщает о пропуске и продолжает проверку остального.
+        """
+        import json
+
+        numbers = [
+            json.loads(path.read_text(encoding="utf-8"))["number"]
+            for path in sorted((ROOT / "data/turns").glob("*.json"))
+        ]
+        gaps = sorted(set(range(1, max(numbers) + 1)) - set(numbers))
+        result = run("scripts/validate.py")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        marker = "отсутствуют — хроника идёт с пропуском"
+        if gaps:
+            self.assertIn(marker, result.stdout)
+        else:
+            self.assertNotIn(marker, result.stdout)
+
     def test_validate_and_links(self):
         result = run("scripts/validate.py", "--dist")
         self.assertEqual(result.returncode, 0, result.stderr)
