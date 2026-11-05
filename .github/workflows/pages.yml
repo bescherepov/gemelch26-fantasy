@@ -44,9 +44,14 @@ jobs:
 
       - name: Собрать сайт
         run: python build.py
+        env:
+          NUKE_LOG: build-log.jsonl
 
       - name: Проверить ссылки в собранном сайте
         run: python scripts/validate.py --dist
+
+      - name: Аудит стандарта NUKE
+        run: python scripts/nuke_audit.py --log build-log.jsonl --base HEAD~1
 
       - name: Артефакт для GitHub Pages
         if: github.event_name != 'pull_request'

@@ -1,12 +1,15 @@
 #!/usr/bin/env python3
-"""Проверка единого источника данных и собранного сайта.
-
-Запуск:
-    python scripts/validate.py           # только данные
-    python scripts/validate.py --dist    # данные + ссылки в dist/
-
-Код возврата 1, если найдена хотя бы одна ошибка.
-"""
+# ==== MODULE CONTRACT: validate ====
+# PURPOSE:   Проверять согласованность источника данных и собранного сайта, чтобы публиковать только проверенный контент.
+# SCOPE:     data/*.json, data/turns/*.json, ссылки и якоря собранного dist/, тексты ошибок и коды возврата CLI.
+# NON-GOALS: Не собирать dist/, не исправлять данные, не заменять unittest и аудит стандарта NUKE.
+# INVARIANTS:код 0 только при отсутствии ошибок; ошибки копятся в errors; проверки не прерывают друг друга.
+# DEPENDS:   build:PAGE_FILES, build:TYPE_LABELS, data:*, site-css:*, site-js:*, assets-img:*, nuke-log:EventLogger
+# EXPOSES:   main, load, err, require, text, check_site, check_world, check_history, check_ethnoses, check_turns, check_gallery, check_table_part, check_buildings, check_links_and_misc, check_dist, check_link, PageScan
+# ERRORS:    SystemExit(1) — найдена хотя бы одна ошибка (в main).
+# TESTS:     T-VALIDATE-001, T-VALIDATE-002, T-VALIDATE-003, T-VALIDATE-004, T-VALIDATE-005, T-VALIDATE-006, T-VALIDATE-007, T-VALIDATE-008
+# ==== END MODULE CONTRACT: validate ====
+"""Проверка единого источника данных и собранного сайта."""
 
 from __future__ import annotations
 
@@ -25,17 +28,36 @@ DIST = ROOT / "dist"
 
 sys.path.insert(0, str(ROOT))
 from build import PAGE_FILES, TYPE_LABELS  # noqa: E402
+from nuke_log import EventLogger  # noqa: E402  (после ROOT: журнал лежит в корне)
 
 COLOR_RE = re.compile(r"^#[0-9a-fA-F]{6}$")
 DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 errors: list[str] = []
+log = EventLogger("validate")
 
 
+# START_BLOCK_VALIDATE_HELPERS: Накопление ошибок, чтение данных и запись исхода группы в журнал. #KEYWORDS: Helpers,Errors,Json,Log
+# PURPOSE: Накопить сообщение об ошибке данных, чтобы main вернул код 1 после всех проверок.
+# INPUTS:
+#   message: str — текст ошибки; не пустой.
+# OUTPUTS:
+#   None — сообщение добавлено в общий список errors.
+# ERRORS: нет.
+# KEYWORDS: [Errors, Report, Collect, Validate]
+# TESTS: [T-VALIDATE-002]
 def err(message: str) -> None:
     errors.append(message)
 
 
+# PURPOSE: Прочитать JSON-файл из data/, чтобы проверки работали с его содержимым.
+# INPUTS:
+#   rel: str — путь относительно data/; файл может отсутствовать.
+# OUTPUTS:
+#   object | None — разобранный JSON; None, если файла нет или JSON некорректен.
+# ERRORS: нет исключений: ошибка чтения добавляется в errors.
+# KEYWORDS: [Json, Load, Data, File]
+# TESTS: [T-VALIDATE-001]
 def load(rel: str):
     path = DATA / rel
     try:
@@ -47,6 +69,14 @@ def load(rel: str):
     return None
 
 
+# PURPOSE: Убедиться, что обязательное поле присутствует и имеет ожидаемый тип.
+# INPUTS:
+#   obj: dict — проверяемый объект; key: str — имя поля; where: str — адрес для сообщения; kind — тип или None.
+# OUTPUTS:
+#   bool — True, если поле корректно; False, если ошибка добавлена в errors.
+# ERRORS: нет исключений: отсутствующее или неверное поле попадает в errors.
+# KEYWORDS: [Fields, Types, Require, Schema]
+# TESTS: [T-VALIDATE-002]
 def require(obj: dict, key: str, where: str, kind=None) -> bool:
     if key not in obj:
         err(f"{where}: отсутствует поле «{key}»")
@@ -57,11 +87,49 @@ def require(obj: dict, key: str, where: str, kind=None) -> bool:
     return True
 
 
+# PURPOSE: Проверить, что текстовое поле заполнено непустой строкой.
+# INPUTS:
+#   obj: dict — объект; key: str — имя поля; where: str — адрес для сообщения.
+# OUTPUTS:
+#   None — ошибка добавлена при необходимости.
+# ERRORS: нет.
+# KEYWORDS: [Text, Empty, Fields, Validate]
+# TESTS: [T-VALIDATE-003]
 def text(obj: dict, key: str, where: str) -> None:
     if require(obj, key, where, str) and not obj[key].strip():
         err(f"{where}: поле «{key}» пустое")
 
 
+# PURPOSE: Опубликовать исход группы проверок в журнал, чтобы траекторию валидатора было видно в JSONL.
+# INPUTS:
+#   block: str — ID якоря группы; symbol: str — validate.<функция>; before: int — число ошибок до группы.
+# OUTPUTS:
+#   None; при выключенном NUKE_LOG — ничего.
+# ERRORS: LogError — пустые поля события (не возникает при корректных вызовах).
+# KEYWORDS: [Log, Event, Group, Outcome]
+# TESTS: [T-VALIDATE-008]
+def _group_event(block: str, symbol: str, before: int) -> None:
+    outcome = "error" if len(errors) > before else "ok"
+    log.event(
+        block,
+        "check",
+        symbol,
+        outcome,
+        errors=len(errors),
+        level="ERROR" if outcome == "error" else "INFO",
+    )
+# END_BLOCK_VALIDATE_HELPERS
+
+
+# START_BLOCK_DATA_CHECKS: Проверки данных сайта, мира, летописи и народов. #KEYWORDS: Data,Site,World,History,Ethnos
+# PURPOSE: Проверить site.json, чтобы меню вело на реально собираемые страницы.
+# INPUTS:
+#   page_names: set[str] — имена собираемых страниц; меню сверяется с ними.
+# OUTPUTS:
+#   None — ошибки добавляются в errors.
+# ERRORS: нет.
+# KEYWORDS: [Site, Menu, Pages, Meta]
+# TESTS: [T-VALIDATE-001]
 def check_site(page_names: set[str]) -> None:
     site = load("site.json")
     if not site:
@@ -96,6 +164,14 @@ def check_site(page_names: set[str]) -> None:
             err(f"{where}: url «{item.get('url')}» не соответствует ни одной странице")
 
 
+# PURPOSE: Проверить world.json, чтобы раздел «Мир» был полным и непустым.
+# INPUTS:
+#   — (файл data/world.json).
+# OUTPUTS:
+#   None — ошибки добавляются в errors.
+# ERRORS: нет.
+# KEYWORDS: [World, Facts, Regions, Laws]
+# TESTS: [T-VALIDATE-002]
 def check_world() -> None:
     world = load("world.json")
     if not world:
@@ -118,6 +194,14 @@ def check_world() -> None:
             text(law, key, where)
 
 
+# PURPOSE: Проверить history.json, чтобы эпохи, битвы и герои были описаны целиком.
+# INPUTS:
+#   — (файл data/history.json).
+# OUTPUTS:
+#   None — ошибки добавляются в errors.
+# ERRORS: нет.
+# KEYWORDS: [History, Epochs, Heroes, Battle]
+# TESTS: [T-VALIDATE-003]
 def check_history() -> None:
     history = load("history.json")
     if not history:
@@ -150,6 +234,14 @@ def check_history() -> None:
                 text(hero, key, where_hero)
 
 
+# PURPOSE: Проверить ethnoses.json, чтобы у народов были уникальные id и канонический цвет.
+# INPUTS:
+#   — (файл data/ethnoses.json).
+# OUTPUTS:
+#   None — ошибки добавляются в errors.
+# ERRORS: нет.
+# KEYWORDS: [Ethnoses, Colors, Status, Ids]
+# TESTS: [T-VALIDATE-004]
 def check_ethnoses() -> None:
     data = load("ethnoses.json")
     if not data:
@@ -167,8 +259,18 @@ def check_ethnoses() -> None:
             err(f"{where}: color должен быть в формате #rrggbb")
         if bool(item.get("status")) != bool(item.get("status_label")):
             err(f"{where}: status и status_label должны быть заполнены вместе")
+# END_BLOCK_DATA_CHECKS
 
 
+# START_BLOCK_TURN_CHECKS: Проверки ходов: нумерация, годы, события и карты. #KEYWORDS: Turns,Events,Years,Maps
+# PURPOSE: Проверить ходы, чтобы номера и годы шли по порядку, а события имели известный тип.
+# INPUTS:
+#   — (каталог data/turns/*.json).
+# OUTPUTS:
+#   list[dict] — разобранные ходы для итогового сообщения main.
+# ERRORS: нет: ошибки добавлены в errors, список может быть неполным.
+# KEYWORDS: [Turns, Events, Years, Sequence]
+# TESTS: [T-VALIDATE-005]
 def check_turns() -> list[dict]:
     directory = DATA / "turns"
     paths = sorted(directory.glob("*.json"))
@@ -230,8 +332,18 @@ def check_turns() -> list[dict]:
         err("turns: годы ходов повторяются")
 
     return turns
+# END_BLOCK_TURN_CHECKS
 
 
+# START_BLOCK_GALLERY_CHECKS: Проверки галереи карт и таблиц. #KEYWORDS: Gallery,Maps,Tables,Categories
+# PURPOSE: Проверить галерею, чтобы карты и таблицы ссылались на объявленные категории и файлы.
+# INPUTS:
+#   — (файлы data/maps.json и data/tables.json).
+# OUTPUTS:
+#   tuple[dict | None, dict | None] — разобранные maps и tables для возможного расширения.
+# ERRORS: нет: ошибки добавлены в errors.
+# KEYWORDS: [Gallery, Maps, Tables, Categories]
+# TESTS: [T-VALIDATE-001]
 def check_gallery() -> tuple[dict | None, dict | None]:
     maps = load("maps.json")
     tables = load("tables.json")
@@ -267,6 +379,14 @@ def check_gallery() -> tuple[dict | None, dict | None]:
     return maps, tables
 
 
+# PURPOSE: Проверить таблицу без картинки, чтобы число ячеек в строке совпадало с числом колонок.
+# INPUTS:
+#   item: dict — запись data/tables.json; where: str — адрес для сообщения.
+# OUTPUTS:
+#   None — ошибки добавляются в errors.
+# ERRORS: нет.
+# KEYWORDS: [Table, Columns, Rows, Cells]
+# TESTS: [T-VALIDATE-001]
 def check_table_part(item: dict, where: str) -> None:
     """Таблица без картинки: колонки и строки с одинаковым числом ячеек."""
     if item.get("file"):
@@ -292,8 +412,18 @@ def check_table_part(item: dict, where: str) -> None:
         for cell in row:
             if not isinstance(cell, str) or not cell.strip():
                 err(f"{where} → rows[{row_index}]: пустая ячейка")
+# END_BLOCK_GALLERY_CHECKS
 
 
+# START_BLOCK_BUILDING_CHECKS: Проверки категорий, местных правил и перекрёстных ссылок построек. #KEYWORDS: Buildings,Categories,Rules,References
+# PURPOSE: Проверить постройки, чтобы категории и местные правила ссылались друг на друга.
+# INPUTS:
+#   — (файл data/buildings.json).
+# OUTPUTS:
+#   None — ошибки добавляются в errors.
+# ERRORS: нет.
+# KEYWORDS: [Buildings, Categories, Rules, References]
+# TESTS: [T-VALIDATE-002]
 def check_buildings() -> None:
     """Постройки: категории, местные правила и перекрёстные ссылки."""
     data = load("buildings.json")
@@ -367,8 +497,18 @@ def check_buildings() -> None:
     for building_id, rule in rules.items():
         if rule not in links.get(building_id, set()):
             err(f"buildings.json: правило «{rule}» не ссылается на постройку «{building_id}»")
+# END_BLOCK_BUILDING_CHECKS
 
 
+# START_BLOCK_LINK_ASSET_CHECKS: Проверки ссылок, рассадки, лога изменений и статических ассетов. #KEYWORDS: Links,Assets,Changelog,Participants
+# PURPOSE: Проверить ссылки, лог изменений и ассеты, чтобы на сайте не было внешних битых адресов.
+# INPUTS:
+#   — (data/links.json, participants.json, changelog.json и assets/).
+# OUTPUTS:
+#   None — ошибки добавляются в errors.
+# ERRORS: нет.
+# KEYWORDS: [Links, Assets, Changelog, Participants]
+# TESTS: [T-VALIDATE-007]
 def check_links_and_misc() -> None:
     links = load("links.json")
     if links:
@@ -409,13 +549,18 @@ def check_links_and_misc() -> None:
     for asset in ("assets/css/style.css", "assets/js/site.js", "assets/img/favicon.svg"):
         if not (ROOT / asset).is_file():
             err(f"нет ассета {asset}")
+# END_BLOCK_LINK_ASSET_CHECKS
 
 
-# --------------------------------------------------------------------------- #
-# Проверка собранного сайта
-# --------------------------------------------------------------------------- #
-
-
+# START_BLOCK_PAGE_SCAN: Разбор собранной HTML-страницы для проверки meta, h1 и ссылок. #KEYWORDS: Html,Parser,Links,Anchors
+# PURPOSE: Собрать из HTML идентификаторы, ссылки, заголовок и meta description для проверки dist.
+# INPUTS:
+#   html: str — содержимое собранной страницы (передаётся через feed).
+# OUTPUTS:
+#   объект с полями ids, links, h1, title, description.
+# ERRORS: нет: HTMLParser разбирает повреждённую разметку без исключений.
+# KEYWORDS: [Html, Parser, Links, Anchors]
+# TESTS: [T-VALIDATE-006]
 class PageScan(HTMLParser):
     def __init__(self) -> None:
         super().__init__(convert_charrefs=True)
@@ -453,11 +598,23 @@ class PageScan(HTMLParser):
             self.title += data
         if self._in_h1:
             self.title += ""
+# END_BLOCK_PAGE_SCAN
 
 
+# START_BLOCK_DIST_CHECKS: Проверка собранного сайта: страницы, meta, h1 и обход ссылок. #KEYWORDS: Dist,Pages,Meta,Links
+# PURPOSE: Проверить dist, чтобы каждая страница имела заголовок, описание и ровно один h1.
+# INPUTS:
+#   — (каталог dist/ и PAGE_FILES сборки).
+# OUTPUTS:
+#   None — ошибки добавляются в errors; ссылки проверяются через check_link.
+# ERRORS: нет: отсутствие dist/ фиксируется как ошибка данных.
+# KEYWORDS: [Dist, Pages, Meta, Links]
+# TESTS: [T-VALIDATE-008]
 def check_dist() -> None:
+    before = len(errors)
     if not DIST.is_dir():
         err("нет каталога dist — сначала запустите python build.py")
+        _group_event("DIST_CHECKS", "validate.check_dist", before)
         return
 
     scans: dict[Path, PageScan] = {}
@@ -477,6 +634,9 @@ def check_dist() -> None:
         if not (DIST / page).is_file():
             err(f"не собрана страница {page}")
 
+    _group_event("DIST_CHECKS", "validate.check_dist", before)
+
+    links_before = len(errors)
     total_links = 0
     for page, scan in scans.items():
         for link in scan.links:
@@ -484,8 +644,19 @@ def check_dist() -> None:
             check_link(page, link, scans)
 
     print(f"Ссылки: проверено {len(pages)} страниц, {total_links} ссылок")
+    _group_event("DIST_LINKS", "validate.check_link", links_before)
+# END_BLOCK_DIST_CHECKS
 
 
+# START_BLOCK_DIST_LINKS: Проверка одной ссылки и её якоря внутри dist. #KEYWORDS: Links,Anchor,Target,Schemes
+# PURPOSE: Проверить одну ссылку страницы, чтобы она вела на существующий файл и якорь сайта.
+# INPUTS:
+#   page: Path — страница-источник; link: str — адрес; scans: dict[Path, PageScan] — разобранные страницы.
+# OUTPUTS:
+#   None — ошибка добавлена при нарушении цели.
+# ERRORS: нет.
+# KEYWORDS: [Links, Anchor, Target, Schemes]
+# TESTS: [T-VALIDATE-005]
 def check_link(page: Path, link: str, scans: dict[Path, PageScan]) -> None:
     if link.startswith(("http://", "https://", "mailto:", "tel:", "javascript:")):
         return
@@ -516,27 +687,53 @@ def check_link(page: Path, link: str, scans: dict[Path, PageScan]) -> None:
             scans[target] = scan
         if scan is not None and fragment not in scan.ids:
             err(f"{page.name}: нет якоря #{fragment} в {target.name}")
+# END_BLOCK_DIST_LINKS
 
 
+# START_BLOCK_MAIN: CLI и порядок групп проверок валидатора. #KEYWORDS: Cli,Report,Order,ExitCode
+# PURPOSE: Запустить все проверки в прежнем порядке и вернуть код возврата для CI.
+# INPUTS:
+#   argv: list[str] | None — аргументы CLI; поддерживается флаг --dist.
+# OUTPUTS:
+#   int — 0 при отсутствии ошибок, 1 при найденной хотя бы одной ошибке.
+# ERRORS: SystemExit(1) — при найденных ошибках (через __main__).
+# SIDE EFFECTS: печать отчёта в stdout/stderr и событий в NUKE_LOG при его включении.
+# KEYWORDS: [Cli, Report, Order, ExitCode]
+# TESTS: [T-VALIDATE-008]
 def main() -> int:
     parser = argparse.ArgumentParser(description="Проверка данных и собранного сайта")
     parser.add_argument("--dist", action="store_true", help="проверить ссылки в dist/")
     args = parser.parse_args()
 
     page_names = set(PAGE_FILES) | {"index.html"}
+    before = len(errors)
     check_site(page_names)
     check_world()
     check_history()
     check_ethnoses()
+    _group_event("DATA_CHECKS", "validate.check_site", before)
+
+    before = len(errors)
     turns = check_turns()
+    _group_event("TURN_CHECKS", "validate.check_turns", before)
+
+    before = len(errors)
     check_gallery()
+    _group_event("GALLERY_CHECKS", "validate.check_gallery", before)
+
+    before = len(errors)
     check_buildings()
+    _group_event("BUILDING_CHECKS", "validate.check_buildings", before)
+
+    before = len(errors)
     check_links_and_misc()
+    _group_event("LINK_ASSET_CHECKS", "validate.check_links_and_misc", before)
 
     if errors:
         print(f"Найдено ошибок: {len(errors)}", file=sys.stderr)
         for message in errors:
             print(f"  • {message}", file=sys.stderr)
+        _group_event("MAIN", "validate.main", 0)
         return 1
 
     events = sum(len(turn.get("events", [])) for turn in turns)
@@ -548,9 +745,12 @@ def main() -> int:
             print(f"Найдено ошибок в dist: {len(errors)}", file=sys.stderr)
             for message in errors:
                 print(f"  • {message}", file=sys.stderr)
+            _group_event("MAIN", "validate.main", 0)
             return 1
 
+    _group_event("MAIN", "validate.main", len(errors))
     return 0
+# END_BLOCK_MAIN
 
 
 if __name__ == "__main__":

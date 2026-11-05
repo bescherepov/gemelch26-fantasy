@@ -1,15 +1,18 @@
-"""Минимальный движок шаблонов без внешних зависимостей.
-
-Поддерживает:
-    {{ выражение }}            — подстановка с автоэкранированием
-    {{ выражение | safe }}     — вставка готового HTML
-    {% for x in список %} … {% endfor %}   (доступен loop.index / first / last)
-    {% if условие %} … {% elif … %} … {% else %} … {% endif %}
-    {% include "partial.html" %}
-
-Фильтры: safe, upper, lower, join(", "), default("—"), date_ru, number, length,
-plural("ход", "хода", "ходов").
-"""
+# ==== MODULE CONTRACT: engine ====
+# PURPOSE:   Рендерить HTML-шаблоны сайта с автоэкранированием, чтобы страницы собирались из данных без внешних зависимостей.
+# SCOPE:     лексер, парсер узлов, выражения, фильтры, рендер дерева, кэш шаблонов и include.
+# NON-GOALS: сеть, запись файлов и dist/, пользовательские теги, журнал операций — модуль чистый (§9).
+# INVARIANTS:автоэкранирование включено по умолчанию; отсутствующий ключ в {{ }} — TemplateError; Safe обходит экранирование; рендер не пишет на диск, не зависит от времени и не ведёт лог.
+# DEPENDS:   нет.
+# EXPOSES:   TemplateError, Safe, Template, TemplateSet, plural_ru
+# ERRORS:    TemplateError — ошибка синтаксиса, отсутствующий ключ, неизвестный фильтр/тег
+# TESTS:     T-ENGINE-001, T-ENGINE-002, T-ENGINE-003, T-ENGINE-004, T-ENGINE-005, T-ENGINE-006,
+#            T-ENGINE-007, T-ENGINE-008, T-ENGINE-009, T-ENGINE-010, T-ENGINE-011, T-ENGINE-012,
+#            T-ENGINE-013, T-ENGINE-014, T-ENGINE-015, T-ENGINE-016, T-ENGINE-017, T-ENGINE-018,
+#            T-ENGINE-019, T-ENGINE-020, T-ENGINE-021, T-ENGINE-022, T-ENGINE-023, T-ENGINE-024,
+#            T-ENGINE-025, T-ENGINE-026, T-ENGINE-027, T-ENGINE-028, T-ENGINE-029
+# ==== END MODULE CONTRACT: engine ====
+"""Движок HTML-шаблонов без внешних зависимостей."""
 
 from __future__ import annotations
 
@@ -20,35 +23,55 @@ from pathlib import Path
 __all__ = ["TemplateError", "Template", "TemplateSet", "Safe", "plural_ru"]
 
 
+# PURPOSE: Обозначить ошибку разбора или рендера шаблона, чтобы сборка падала с понятной причиной.
+# INPUTS:
+#   message: str — описание с именем шаблона и причиной; не пустое.
+# OUTPUTS: нет — символ существует только как исключение.
+# ERRORS: нет.
+# KEYWORDS: [TemplateError, Syntax, MissingKey, UnknownFilter, UnknownTag]
+# TESTS: [T-ENGINE-006, T-ENGINE-023, T-ENGINE-025, T-ENGINE-026, T-ENGINE-027, T-ENGINE-028]
 class TemplateError(Exception):
     """Ошибка разбора или рендера шаблона."""
 
 
+# PURPOSE: Пометить готовый HTML, чтобы движок вставлял его без экранирования.
+# INPUTS:
+#   value: str — разметка, безопасность которой подтвердил вызывающий код.
+# OUTPUTS: Safe — подкласс str, обходящий автоэкранирование.
+# ERRORS: нет.
+# KEYWORDS: [Safe, Markup, Escape, RawHtml]
+# TESTS: [T-ENGINE-004, T-ENGINE-029]
 class Safe(str):
     """Строка, которую не нужно экранировать."""
 
 
+# START_BLOCK_TOKENIZE_PARSE: Лексер шаблона и рекурсивный разбор узлов for/if/include. #KEYWORDS: Tokenize,Parse,Node,For,If,Include
 _TOKEN_RE = re.compile(r"(\{\{.*?\}\}|\{%.*?%\})", re.S)
 _FOR_RE = re.compile(r"^for\s+([A-Za-z_]\w*)\s+in\s+(.+)$", re.S)
 _INCLUDE_RE = re.compile(r"""^include\s+["']([^"']+)["']$""")
-_CALL_RE = re.compile(r"^([A-Za-z_]\w*)(?:\((.*)\))?$", re.S)
-_COMPARE_RE = re.compile(r"^(.+?)\s*(==|!=)\s*(.+)$", re.S)
-_NUM_RE = re.compile(r"^-?\d+$")
-
-_MONTHS = (
-    "января", "февраля", "марта", "апреля", "мая", "июня",
-    "июля", "августа", "сентября", "октября", "ноября", "декабря",
-)
 
 
-# --------------------------------------------------------------------------- #
-# Лексер и парсер
-# --------------------------------------------------------------------------- #
-
+# PURPOSE: Разрезать исходник на текст и теги, чтобы парсер видел плоский поток токенов.
+# INPUTS:
+#   source: str — исходник шаблона целиком.
+# OUTPUTS:
+#   list[str] — чередование текста и фрагментов {{ }} / {% %}.
+# ERRORS: нет.
+# KEYWORDS: [Tokenize, Split, Lexer, Template]
+# TESTS: [T-ENGINE-001, T-ENGINE-002, T-ENGINE-026]
 def _tokenize(source: str) -> list[str]:
     return _TOKEN_RE.split(source)
 
 
+# PURPOSE: Разобрать шаблон целиком и отвергнуть лишний закрывающий тег.
+# INPUTS:
+#   tokens: list[str] — результат лексера; name: str — имя шаблона для ошибок.
+# OUTPUTS:
+#   list[tuple] — дерево узлов шаблона.
+# ERRORS:
+#   TemplateError — после разбора остались необработанные токены.
+# KEYWORDS: [Parse, Tree, TrailingTag, Template]
+# TESTS: [T-ENGINE-010, T-ENGINE-026, T-ENGINE-027]
 def _parse(tokens: list[str], name: str) -> list[tuple]:
     nodes, pos = _parse_body(tokens, 0, name, stop=set())
     if pos != len(tokens):
@@ -56,6 +79,16 @@ def _parse(tokens: list[str], name: str) -> list[tuple]:
     return nodes
 
 
+# PURPOSE: Набрать узлы тела блока до стоп-тега, рекурсивно раскрывая вложенные теги.
+# INPUTS:
+#   tokens: list[str] — токены лексера; pos: int — позиция продолжения разбора;
+#   name: str — имя шаблона; stop: set[str] — теги, завершающие тело.
+# OUTPUTS:
+#   tuple[list[tuple], int] — узлы и позиция стоп-тега.
+# ERRORS:
+#   TemplateError — неизвестный тег, неверный for/include, незакрытый if.
+# KEYWORDS: [ParseBody, Recursion, StopTag, NodeList]
+# TESTS: [T-ENGINE-010, T-ENGINE-026, T-ENGINE-027]
 def _parse_body(tokens: list[str], pos: int, name: str, stop: set[str]):
     nodes: list[tuple] = []
     while pos < len(tokens):
@@ -133,12 +166,24 @@ def _tag_at(tokens: list[str], pos: int) -> str | None:
 def _expect(tokens: list[str], pos: int, tag: str, name: str) -> None:
     if _tag_at(tokens, pos) != tag:
         raise TemplateError(f"{name}: ожидался {tag}")
+# END_BLOCK_TOKENIZE_PARSE
 
 
-# --------------------------------------------------------------------------- #
-# Выражения
-# --------------------------------------------------------------------------- #
+# START_BLOCK_EXPRESSION_FILTERS: Подготовка фильтров: разбор цепочки, аргументов и форм слова. #KEYWORDS: Filter,Split,Quote,Plural,Russian
+_MONTHS = (
+    "января", "февраля", "марта", "апреля", "мая", "июня",
+    "июля", "августа", "сентября", "октября", "ноября", "декабря",
+)
 
+
+# PURPOSE: Отделить базовое значение от цепочки фильтров, не разрывая строки в кавычках.
+# INPUTS:
+#   expr: str — выражение из {{ }} или операнд условия.
+# OUTPUTS:
+#   list[str] — значение первым элементом, затем фильтры с аргументами.
+# ERRORS: нет.
+# KEYWORDS: [Split, Filter, Pipeline, Quote, Expression]
+# TESTS: [T-ENGINE-002, T-ENGINE-028]
 def _split_filters(expr: str) -> list[str]:
     parts, buf, quote = [], [], None
     for char in expr:
@@ -178,6 +223,14 @@ def _split_args(raw: str) -> list[str]:
     return [part for part in parts if part]
 
 
+# PURPOSE: Выбрать русскую форму слова по числу, чтобы подписи читались естественно.
+# INPUTS:
+#   number: int — количество; one: str — форма для 1; few: str — для 2–4; many: str — для 5+.
+# OUTPUTS:
+#   str — одна из переданных форм.
+# ERRORS: нет.
+# KEYWORDS: [Plural, Russian, Declension, Number, Grammar]
+# TESTS: [T-ENGINE-022]
 def plural_ru(number: int, one: str, few: str, many: str) -> str:
     """Русская форма слова по числу: 1 событие, 2 события, 5 событий."""
     tail, hundred = number % 10, number % 100
@@ -193,8 +246,24 @@ def _unquote(text: str):
     if len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'":
         return text[1:-1]
     return text
+# END_BLOCK_EXPRESSION_FILTERS
 
 
+# START_BLOCK_EXPRESSION_EVAL: Вычисление операндов, разрешение путей и применение фильтров. #KEYWORDS: Resolve,Eval,Filter,Condition,Literal
+_CALL_RE = re.compile(r"^([A-Za-z_]\w*)(?:\((.*)\))?$", re.S)
+_COMPARE_RE = re.compile(r"^(.+?)\s*(==|!=)\s*(.+)$", re.S)
+_NUM_RE = re.compile(r"^-?\d+$")
+
+
+# PURPOSE: Найти значение по точечному пути в контексте, чтобы {{ a.b }} работал предсказуемо.
+# INPUTS:
+#   path: str — путь через точки; ctx: dict — корень поиска.
+# OUTPUTS:
+#   значение из контекста; литералы true/false/none дают bool или None.
+# ERRORS:
+#   TemplateError — ключа нет в словаре или атрибута нет у объекта.
+# KEYWORDS: [Resolve, DottedPath, Context, MissingKey]
+# TESTS: [T-ENGINE-002, T-ENGINE-005, T-ENGINE-006]
 def _resolve(path: str, ctx: dict):
     if path in ("true", "True"):
         return True
@@ -224,6 +293,15 @@ def _literal(text: str):
     return _resolve(text, {})
 
 
+# PURPOSE: Применить фильтр к значению по имени, чтобы шаблоны оставались без логики.
+# INPUTS:
+#   name: str — имя фильтра из белого списка; arg: str | None — аргумент в скобках; value — вход.
+# OUTPUTS:
+#   значение после фильтра; safe возвращает Safe, length и plural — числа или строки.
+# ERRORS:
+#   TemplateError — неизвестный фильтр, неверное число форм plural, неверная дата.
+# KEYWORDS: [Filter, Registry, Safe, DateRu, Plural]
+# TESTS: [T-ENGINE-004, T-ENGINE-016, T-ENGINE-017, T-ENGINE-018, T-ENGINE-019, T-ENGINE-020, T-ENGINE-021, T-ENGINE-022, T-ENGINE-023, T-ENGINE-028]
 def _apply_filter(name: str, arg: str | None, value):
     if name == "safe":
         return Safe("" if value is None else str(value))
@@ -279,6 +357,14 @@ def _eval_operand(text: str, ctx: dict):
     return _eval_expr(text, ctx)
 
 
+# PURPOSE: Вычислить операнд условия, считая отсутствующий ключ пустым значением.
+# INPUTS:
+#   expr: str — операнд условия; ctx: dict — контекст.
+# OUTPUTS:
+#   значение операнда или None, если ключа нет.
+# ERRORS: нет — TemplateError подавляется намеренно ради необязательных полей.
+# KEYWORDS: [SoftEval, Optional, MissingKey, Condition]
+# TESTS: [T-ENGINE-009, T-ENGINE-011, T-ENGINE-012]
 def _eval_soft(expr: str, ctx: dict):
     """Как _eval_operand, но отсутствующий ключ считается пустым значением.
 
@@ -291,6 +377,14 @@ def _eval_soft(expr: str, ctx: dict):
         return None
 
 
+# PURPOSE: Решить, какая ветка if/elif рендерится, по истинности или сравнению.
+# INPUTS:
+#   expr: str — условие; ctx: dict — контекст.
+# OUTPUTS:
+#   bool — результат условия; отсутствующий ключ считается ложным.
+# ERRORS: нет — ошибки выражения проглатываются soft-вычислением.
+# KEYWORDS: [Condition, Compare, Not, Truthiness, Branch]
+# TESTS: [T-ENGINE-007, T-ENGINE-008, T-ENGINE-009, T-ENGINE-010, T-ENGINE-011, T-ENGINE-012]
 def _eval_condition(expr: str, ctx: dict) -> bool:
     expr = expr.strip()
     if expr.startswith("not "):
@@ -301,12 +395,18 @@ def _eval_condition(expr: str, ctx: dict) -> bool:
         right = _eval_soft(match.group(3), ctx)
         return (left == right) if match.group(2) == "==" else (left != right)
     return bool(_eval_soft(expr, ctx))
+# END_BLOCK_EXPRESSION_EVAL
 
 
-# --------------------------------------------------------------------------- #
-# Рендер
-# --------------------------------------------------------------------------- #
-
+# START_BLOCK_RENDER_TREE: Обход дерева узлов и сборка HTML с экранированием. #KEYWORDS: Render,Tree,Recursion,Loop,Include,Escape
+# PURPOSE: Вставить значение в HTML, экранируя всё, кроме помеченного Safe.
+# INPUTS:
+#   value — любое значение контекста; None даёт пустую строку.
+# OUTPUTS:
+#   str — HTML-фрагмент; спецсимволы заменены на сущности.
+# ERRORS: нет.
+# KEYWORDS: [Escape, Safe, Html, Autoescape]
+# TESTS: [T-ENGINE-003, T-ENGINE-004]
 def _to_html(value) -> str:
     if isinstance(value, Safe):
         return str(value)
@@ -315,6 +415,15 @@ def _to_html(value) -> str:
     return html.escape(str(value), quote=True)
 
 
+# PURPOSE: Собрать HTML из дерева узлов, рекурсивно раскрывая for/if/include.
+# INPUTS:
+#   nodes: list[tuple] — дерево разбора; ctx: dict — значения; template: Template — владелец для include.
+# OUTPUTS:
+#   str — HTML фрагмента шаблона.
+# ERRORS:
+#   TemplateError — неизвестный узел, ошибка выражения или отсутствующий include.
+# KEYWORDS: [Render, Tree, Recursion, Loop, Include, Escape]
+# TESTS: [T-ENGINE-001, T-ENGINE-002, T-ENGINE-003, T-ENGINE-007, T-ENGINE-008, T-ENGINE-013, T-ENGINE-014, T-ENGINE-015, T-ENGINE-024]
 def _render(nodes: list[tuple], ctx: dict, template: "Template") -> str:
     out: list[str] = []
     for node in nodes:
@@ -359,14 +468,35 @@ def _render(nodes: list[tuple], ctx: dict, template: "Template") -> str:
             raise TemplateError(f"неизвестный узел {kind!r}")
 
     return "".join(out)
+# END_BLOCK_RENDER_TREE
 
 
+# START_BLOCK_TEMPLATE_API: Публичный API шаблона и набора шаблонов с кэшем. #KEYWORDS: Template,TemplateSet,Cache,Include,Api
+# PURPOSE: Разобрать исходник шаблона один раз и отрендерить его с контекстом.
+# INPUTS:
+#   name: str — имя для сообщений об ошибках; source: str — текст шаблона;
+#   loader — функция загрузки include по имени.
+# OUTPUTS:
+#   Template — разобранный шаблон, готовый к рендеру.
+# ERRORS:
+#   TemplateError — синтаксис шаблона не разобран.
+# KEYWORDS: [Template, Parse, Render, Include, Context]
+# TESTS: [T-ENGINE-001, T-ENGINE-006, T-ENGINE-024]
 class Template:
     def __init__(self, name: str, source: str, loader) -> None:
         self.name = name
         self._loader = loader
         self.nodes = _parse(_tokenize(source), name)
 
+    # PURPOSE: Отрендерить шаблон с контекстом, добавляя имя шаблона к тексту ошибки.
+    # INPUTS:
+    #   ctx: dict — значения; копируется, исходный словарь не мутируется.
+    # OUTPUTS:
+    #   str — HTML страницы.
+    # ERRORS:
+    #   TemplateError — отсутствующий ключ или ошибка include, с префиксом имени.
+    # KEYWORDS: [Render, Context, Html, ErrorPrefix]
+    # TESTS: [T-ENGINE-001, T-ENGINE-002, T-ENGINE-006]
     def render(self, ctx: dict) -> str:
         try:
             return _render(self.nodes, dict(ctx), self)
@@ -374,6 +504,15 @@ class Template:
             raise TemplateError(f"{self.name}: {exc}") from exc
 
 
+# PURPOSE: Держать набор шаблонов каталога с кэшем, чтобы include не перечитывал диск.
+# INPUTS:
+#   root: Path — каталог шаблонов; путь нормализуется.
+# OUTPUTS:
+#   TemplateSet — доступ к шаблонам по имени.
+# ERRORS:
+#   TemplateError — запрошенный шаблон не найден.
+# KEYWORDS: [TemplateSet, Cache, Directory, Include]
+# TESTS: [T-ENGINE-024, T-ENGINE-025]
 class TemplateSet:
     """Набор шаблонов из каталога с кэшем и include."""
 
@@ -381,6 +520,15 @@ class TemplateSet:
         self.root = Path(root)
         self._cache: dict[str, Template] = {}
 
+    # PURPOSE: Вернуть шаблон по имени из кэша, разбирая файл только при первом обращении.
+    # INPUTS:
+    #   name: str — путь относительно корня; обратные слэши нормализуются.
+    # OUTPUTS:
+    #   Template — разобранный шаблон из кэша.
+    # ERRORS:
+    #   TemplateError — файла шаблона нет в каталоге.
+    # KEYWORDS: [Get, Cache, Normalize, Lookup]
+    # TESTS: [T-ENGINE-024, T-ENGINE-025]
     def get(self, name: str) -> Template:
         name = name.replace("\\", "/")
         if name not in self._cache:
@@ -392,5 +540,15 @@ class TemplateSet:
             )
         return self._cache[name]
 
+    # PURPOSE: Отрендерить шаблон по имени, не раскрывая кэш наружу.
+    # INPUTS:
+    #   name: str — имя шаблона; ctx: dict — контекст рендера.
+    # OUTPUTS:
+    #   str — HTML.
+    # ERRORS:
+    #   TemplateError — шаблон не найден или рендер не удался.
+    # KEYWORDS: [Render, Lookup, Html]
+    # TESTS: [T-ENGINE-024, T-ENGINE-025]
     def render(self, name: str, ctx: dict) -> str:
         return self.get(name).render(ctx)
+# END_BLOCK_TEMPLATE_API

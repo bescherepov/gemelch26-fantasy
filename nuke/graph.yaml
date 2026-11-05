@@ -1,0 +1,118 @@
+# NUKE-GRAPH v1
+# Единственный внешний артефакт стандарта NUKE (NUKE.md §4).
+# Генерируется и проверяется scripts/nuke_audit.py; вручную поддерживается
+# только вместе с кодом в одном патче (G-14).
+nuke_version: "2.0"
+app: gemelch26-fantasy
+purpose: "Публиковать хронику партии «Гегемония» статическим сайтом из единого источника данных"
+stack: [python3.9, html, css, javascript]
+budget_tokens: 8000
+
+nodes:
+  - id: engine
+    path: engine.py
+    purpose: "Рендерить HTML-шаблоны с автоэкранированием без внешних зависимостей"
+    owns: [TemplateError, Safe, Template, TemplateSet, plural_ru]
+    depends: []
+    in: [templates.TemplateSource]
+    out: [templates.RenderedHtml]
+    tests: [tests/test_engine.py]
+
+  - id: nuke-log
+    path: nuke_log.py
+    purpose: "Вести машиночитаемый журнал операций для сверки траектории сборки и проверок"
+    owns: [EventLogger, LogError, event]
+    depends: []
+    in: [build.BuildStep, validate.ValidateStep]
+    out: [ci.JsonlLog]
+    tests: [tests/test_nuke.py]
+
+  - id: build
+    path: build.py
+    purpose: "Собирать статический сайт из data/ в dist/ без сети и внешних пакетов"
+    owns: [build, prepare_turns, prepare_buildings, build_type_stats, check_assets, load_json, fail, plural, TYPE_LABELS, PAGE_FILES, FACT_FIELDS]
+    depends: [engine, data, templates, site-css, site-js, assets-img, nuke-log]
+    in: [data.TurnSource, templates.TemplateSource]
+    out: [dist.Pages, dist.Sitemap]
+    tests: [tests/test_build.py]
+
+  - id: validate
+    path: scripts/validate.py
+    purpose: "Проверять согласованность источника данных и собранного сайта перед публикацией"
+    owns: [main, check_site, check_world, check_history, check_ethnoses, check_turns, check_gallery, check_buildings, check_links_and_misc, check_dist, PageScan]
+    depends: [build, data, site-css, site-js, assets-img, nuke-log]
+    in: [data.JsonSource, dist.Pages]
+    out: [ci.ValidationReport]
+    tests: [tests/test_build.py]
+
+  - id: changelog
+    path: scripts/changelog.py
+    purpose: "Дополнять лог изменений записями из истории git по каталогу data/"
+    owns: [main, git_entries, foundation_commits, normalize, run_git]
+    depends: [data, nuke-log]
+    in: [git.History]
+    out: [data.Changelog]
+    tests: [tests/test_changelog.py]
+
+  - id: nuke-audit
+    path: scripts/nuke_audit.py
+    purpose: "Проверять соблюдение стандарта NUKE: контракты, якоря, граф, тесты и логи"
+    owns: [main, audit, check_module_contracts, check_purpose_contracts, check_anchors, check_graph, check_markdown, check_test_ids, check_log, load_graph]
+    depends: [nuke-log]
+    in: [nuke.Graph, repo.Sources]
+    out: [ci.AuditReport]
+    tests: [tests/test_nuke.py]
+
+  - id: templates
+    path: templates/
+    purpose: "Описывать HTML-страницы сайта декларативно, без встроенной логики"
+    owns: [base.html, index.html, world.html, ethnoses.html, turns.html, maps.html, tables.html, buildings.html, participants.html, log.html, links.html, 404.html]
+    depends: [engine]
+    in: [build.PageContext]
+    out: [templates.RenderedHtml]
+    tests: [tests/test_build.py]
+
+  - id: site-js
+    path: assets/js/site.js
+    purpose: "Улучшать интерфейс прогрессивно, сохраняя сайт читаемым без JavaScript"
+    owns: [site.js]
+    depends: [templates]
+    in: [templates.HtmlHooks]
+    out: [browser.Interaction]
+    tests: [tests/test_site_js.py]
+
+  - id: site-css
+    path: assets/css/style.css
+    purpose: "Задавать визуальный слой через токены, раскладку и адаптивные состояния"
+    owns: [style.css]
+    depends: [templates]
+    in: [templates.HtmlHooks]
+    out: [browser.Styles]
+    tests: [tests/test_build.py]
+
+  - id: data
+    path: data/
+    purpose: "Хранить игровой контент как единственный источник информации для сборки"
+    owns: [site.json, world.json, history.json, ethnoses.json, maps.json, tables.json, buildings.json, participants.json, links.json, changelog.json, turns/]
+    depends: [assets-img]
+    in: [sources.MasterText]
+    out: [data.TurnSource, data.JsonSource]
+    tests: [tests/test_build.py]
+
+  - id: assets-img
+    path: assets/img/
+    purpose: "Хранить карты, таблицы и иконки, на которые ссылаются данные"
+    owns: [maps, tables, favicon.svg, og.jpg]
+    depends: []
+    in: [sources.MasterMap]
+    out: [data.ImageReference]
+    tests: [tests/test_build.py]
+
+  - id: tests
+    path: tests/
+    purpose: "Исполнять проверки поведения движка, сборки, лога и стандарта NUKE"
+    owns: [test_engine.py, test_build.py, test_changelog.py, test_site_js.py, test_nuke.py, fixtures/]
+    depends: [engine, build, validate, changelog, nuke-log, nuke-audit, templates, site-js, site-css, data, assets-img]
+    in: [repo.Sources]
+    out: [ci.TestReport]
+    tests: [tests/]

@@ -14,3 +14,11 @@ desktop.ini
 
 # Системные lock-файлы
 ~lock.*
+
+NUKE.md
+
+# Локальные артефакты NUKE
+build-log.jsonl
+.tmp/
+.nuke-*
+/probe-*/

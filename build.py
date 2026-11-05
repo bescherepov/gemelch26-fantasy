@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
-"""Сборка сайта «Расфадаль» из единого источника данных.
-
-Единственный вход — каталог data/*.json. Всё, что попадает в dist/,
-является производным от этих файлов, шаблонов и статических ассетов.
-Никаких внешних зависимостей: только стандартная библиотека Python.
-"""
+# ==== MODULE CONTRACT: build ====
+# PURPOSE:   Собирать статический сайт хроники из data/ в dist/, чтобы публикация шла из единственного источника без сети и внешних пакетов.
+# SCOPE:     загрузка JSON, подготовка ходов и построек, статистика типов, проверка изображений, контекст шаблонов, рендер страниц, запись dist/, sitemap и robots.
+# NON-GOALS: не хранить игровой контент и не проверять его полноту (scripts/validate.py), не публиковать сайт (CI), не писать журнал при выключенном NUKE_LOG.
+# INVARIANTS:dist/ — производное от data/, templates/ и assets/; сборка без сети, случайности и текущего времени в контенте (дата — только подвал и sitemap); при выключенном журнале вывод и dist/ не меняются.
+# DEPENDS:   engine:TemplateSet, data:*, templates:*, site-css:*, site-js:*, assets-img:*, nuke-log:EventLogger
+# EXPOSES:   build, prepare_turns, prepare_buildings, build_type_stats, check_assets, load_json, fail, plural, TYPE_LABELS, PAGE_FILES, FACT_FIELDS
+# ERRORS:    SystemExit(1) — нет файла данных, битый JSON или отсутствующее изображение; TemplateError — ошибка шаблона.
+# TESTS:     T-BUILD-001, T-BUILD-002, T-BUILD-003, T-BUILD-004, T-BUILD-005, T-BUILD-006, T-BUILD-007, T-BUILD-008, T-BUILD-009, T-BUILD-010, T-BUILD-011, T-BUILD-012
+# ==== END MODULE CONTRACT: build ====
+"""Собрать сайт «Расфадаль» из data/ в dist/ без внешних зависимостей и сети."""
 
 from __future__ import annotations
 
@@ -16,6 +21,7 @@ from datetime import date, datetime
 from pathlib import Path
 
 from engine import Safe, TemplateError, TemplateSet, plural_ru
+from nuke_log import EventLogger
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
@@ -23,6 +29,12 @@ TEMPLATES = ROOT / "templates"
 ASSETS = ROOT / "assets"
 DIST = ROOT / "dist"
 
+# PURPOSE: Вести журнал шагов сборки для сверки траектории по §9, не меняя вывод при выключенном NUKE_LOG.
+log = EventLogger("build")
+
+# PURPOSE: Сопоставить тип события хода с подписью бейджа, чтобы шаблоны не знали кодов типов.
+# KEYWORDS: [Labels, Types, Badges, Turn]
+# TESTS: [T-BUILD-005]
 TYPE_LABELS = {
     "politics": "Политика",
     "war": "Война",
@@ -36,6 +48,9 @@ TYPE_LABELS = {
     "migration": "Переселение",
 }
 
+# PURPOSE: Задать полный список собираемых страниц как единственный источник для sitemap и проверок.
+# KEYWORDS: [Pages, Sitemap, Routes, Files]
+# TESTS: [T-BUILD-003]
 PAGE_FILES = [
     "index.html",
     "world.html",
@@ -50,25 +65,79 @@ PAGE_FILES = [
 ]
 
 
+# START_BLOCK_FAIL_FAST: Аварийный выход сборки с понятным сообщением. #KEYWORDS: Fail,Error,Exit,Diagnostics
+# PURPOSE: Прервать сборку с внятным сообщением, чтобы ошибка данных не давала молча битый dist/.
+# INPUTS:
+#   message: str — что именно сломалось; не пусто.
+# OUTPUTS:
+#   нет: управление не возвращается.
+# ERRORS:
+#   SystemExit(1) — всегда, сразу после печати сообщения.
+# SIDE EFFECTS: печать строки «Ошибка сборки: …» в stderr.
+# PRECONDITIONS: message уже содержит имя файла и поле — диагностика не досочиняется.
+# POSTCONDITIONS: процесс завершён с кодом 1; dist/ после вызова не меняется.
+# KEYWORDS: [Fail, Error, ExitCode, Diagnostics, Stderr]
+# TESTS: [T-BUILD-001, T-BUILD-012]
 def fail(message: str) -> None:
     print(f"Ошибка сборки: {message}", file=sys.stderr)
     raise SystemExit(1)
+# END_BLOCK_FAIL_FAST
 
 
+# START_BLOCK_PLURAL_RU: Согласование числительных с существительными в отчёте сборки. #KEYWORDS: Plural,Ru,Report,Declension
+# PURPOSE: Согласовать число с существительным для итоговой строки сборки, чтобы отчёт читался по-русски.
+# INPUTS:
+#   number: int — количество, целое, >= 0.
+#   one/few/many: str — словоформы для 1, 2–4 и прочих чисел.
+# OUTPUTS:
+#   str — выбранная словоформа.
+# SIDE EFFECTS: нет.
+# ERRORS: нет: при нуле и нецелых числах возвращается форма «many».
+# PRECONDITIONS: number — целое; словоформы заданы вызывающим кодом.
+# POSTCONDITIONS: возвращённая форма согласована с number по правилам русского языка.
+# INVARIANTS: результат не зависит от времени, локали и порядка вызовов.
+# KEYWORDS: [Plural, Russian, Declension, Report]
+# TESTS: [T-BUILD-001]
 def plural(number: int, one: str, few: str, many: str) -> str:
     return plural_ru(number, one, few, many)
+# END_BLOCK_PLURAL_RU
 
 
+# START_BLOCK_LOAD_JSON: Чтение JSON-источника с ошибкой сборки вместо трейсбека. #KEYWORDS: Load,Json,File,Error
+# PURPOSE: Прочитать JSON-источник данных, превратив отсутствие файла и битый JSON в понятную ошибку сборки с событием журнала.
+# INPUTS:
+#   path: Path — путь к файлу в data/; файл может отсутствовать или быть некорректным.
+# OUTPUTS:
+#   object — разобранное содержимое JSON без преобразований.
+# ERRORS:
+#   SystemExit(1) — файла нет или JSON некорректен; перед выходом пишется событие outcome="error".
+# SIDE EFFECTS: чтение файла; при включённом журнале — запись события об ошибке.
+# KEYWORDS: [Json, Load, DataSource, Validation, Error]
+# TESTS: [T-BUILD-001, T-BUILD-010]
 def load_json(path: Path):
     if not path.is_file():
+        log.event("LOAD_JSON", "build", "build.load_json", "error", level="ERROR", path=path.name)
         fail(f"нет файла данных {path.relative_to(ROOT)}")
     try:
         with path.open(encoding="utf-8") as handle:
             return json.load(handle)
     except json.JSONDecodeError as exc:
+        log.event("LOAD_JSON", "build", "build.load_json", "error", level="ERROR", path=path.name)
         fail(f"{path.relative_to(ROOT)}: некорректный JSON — {exc}")
+# END_BLOCK_LOAD_JSON
 
 
+# START_BLOCK_PREPARE_TURNS: Подготовка ходов к рендеру. #KEYWORDS: Turns,Sort,Events,Neighbors
+# PURPOSE: Упорядочить ходы и обогатить их подписями типов и соседями, чтобы шаблон только выводил готовые данные.
+# INPUTS:
+#   raw_turns: list[dict] — загруженные ходы; у каждого есть number и непустой events.
+# OUTPUTS:
+#   list[dict] — ходы по возрастанию number; у событий type_label, у хода type_counts/prev/next.
+# ERRORS:
+#   KeyError — если в данных нет обязательного поля; полноту данных проверяет scripts/validate.py.
+# POSTCONDITIONS: ходы упорядочены стабильно; prev/next образуют связный список.
+# KEYWORDS: [Turns, Sort, Events, Timeline, Neighbors]
+# TESTS: [T-BUILD-005, T-BUILD-010]
 def prepare_turns(raw_turns: list[dict]) -> list[dict]:
     turns = sorted(raw_turns, key=lambda item: item["number"])
     for turn in turns:
@@ -86,8 +155,19 @@ def prepare_turns(raw_turns: list[dict]) -> list[dict]:
         turn["prev"] = turns[index - 1] if index > 0 else None
         turn["next"] = turns[index + 1] if index + 1 < len(turns) else None
     return turns
+# END_BLOCK_PREPARE_TURNS
 
 
+# START_BLOCK_TYPE_STATS: Статистика типов событий для полос на странице ходов. #KEYWORDS: Stats,Types,Bars,Percent
+# PURPOSE: Посчитать частоты типов событий и их ширину в процентах, чтобы страница ходов показывала соразмерные полосы.
+# INPUTS:
+#   turns: list[dict] — подготовленные ходы с непустым events.
+# OUTPUTS:
+#   list[dict] — записи id/label/count/width в порядке TYPE_LABELS; пустой список, если событий нет.
+# ERRORS: нет: отсутствие событий даёт пустой список, а не деление на ноль.
+# POSTCONDITIONS: у самого частого типа width == 100; больших чисел не бывает.
+# KEYWORDS: [Stats, Types, Percent, Distribution, Bars]
+# TESTS: [T-BUILD-005]
 def build_type_stats(turns: list[dict]) -> list[dict]:
     counts = {}
     for turn in turns:
@@ -106,8 +186,21 @@ def build_type_stats(turns: list[dict]) -> list[dict]:
         for key in TYPE_LABELS
         if key in counts
     ]
+# END_BLOCK_TYPE_STATS
 
 
+# START_BLOCK_CHECK_ASSETS: Проверка существования всех изображений данных. #KEYWORDS: Assets,Images,References,Existence
+# PURPOSE: Убедиться, что каждое изображение из данных лежит в assets/, чтобы сборка не публиковала битые ссылки.
+# INPUTS:
+#   turns: list[dict] — ходы; map.image может отсутствовать.
+#   maps: dict — каталог карт с ключом maps; tables: dict — таблицы с ключом tables.
+# OUTPUTS:
+#   нет — функция только проверяет.
+# ERRORS:
+#   SystemExit(1) — хотя бы одного файла изображения нет; перед выходом пишется событие outcome="error".
+# SIDE EFFECTS: чтение файловой системы; при включённом журнале — событие об ошибке.
+# KEYWORDS: [Assets, Images, Reference, Integrity, Dist]
+# TESTS: [T-BUILD-009, T-BUILD-012]
 def check_assets(turns: list[dict], maps: dict, tables: dict) -> None:
     referenced: set[str] = set()
     for turn in turns:
@@ -121,9 +214,14 @@ def check_assets(turns: list[dict], maps: dict, tables: dict) -> None:
     referenced.add("assets/img/favicon.svg")
     missing = [path for path in sorted(referenced) if not (ROOT / path).is_file()]
     if missing:
+        log.event("CHECK_ASSETS", "build", "build.check_assets", "error", level="ERROR", missing=len(missing))
         fail("не найдены изображения: " + ", ".join(missing))
+# END_BLOCK_CHECK_ASSETS
 
 
+# PURPOSE: Перечислить поля построек, попадающие в карточку, чтобы порядок фактов задавался данными, а не шаблоном.
+# KEYWORDS: [Buildings, Facts, Labels, Catalog]
+# TESTS: [T-BUILD-007]
 FACT_FIELDS = (
     ("cost", "Стоимость"),
     ("income", "Доход"),
@@ -138,6 +236,17 @@ FACT_FIELDS = (
 )
 
 
+# START_BLOCK_PREPARE_BUILDINGS: Подготовка каталога построек. #KEYWORDS: Buildings,Categories,Rules,Facts
+# PURPOSE: Разложить постройки по категориям и связать их с местными правилами и полями карточки, чтобы шаблон не искал связи сам.
+# INPUTS:
+#   raw: dict — buildings.json с ключами buildings/changes/categories; id уникальны.
+# OUTPUTS:
+#   dict — тот же объект: у правил items, у построек local/has_group/facts, у категорий items/count, total — число построек.
+# ERRORS:
+#   SystemExit(1) — правило ссылается на неизвестную постройку или у постройки неизвестное правило; перед выходом пишется событие outcome="error".
+# PRECONDITIONS: buildings.json уже прочитан; все постройки имеют непустой name.
+# KEYWORDS: [Buildings, Categories, LocalRule, Facts, Catalog]
+# TESTS: [T-BUILD-007, T-BUILD-008]
 def prepare_buildings(raw: dict) -> dict:
     """Раскладывает постройки по категориям и связывает их с местными правилами."""
     buildings = raw["buildings"]
@@ -148,6 +257,7 @@ def prepare_buildings(raw: dict) -> dict:
         items = []
         for building_id in change["buildings"]:
             if building_id not in by_id:
+                log.event("PREPARE_BUILDINGS", "build", "build.prepare_buildings", "error", level="ERROR", rule=change["id"])
                 fail(f"buildings.json: правило «{change['id']}» ссылается на неизвестную постройку {building_id}")
             items.append(by_id[building_id])
         change["items"] = items
@@ -155,6 +265,7 @@ def prepare_buildings(raw: dict) -> dict:
     for building in buildings:
         rule = building.get("local_rule")
         if rule and rule not in changes:
+            log.event("PREPARE_BUILDINGS", "build", "build.prepare_buildings", "error", level="ERROR", building=building["id"])
             fail(f"buildings.json: у постройки «{building['name']}» неизвестное правило «{rule}»")
         building["local"] = changes.get(rule) if rule else None
         building["has_group"] = bool(building["group"]) and building["group"] != building["name"]
@@ -175,9 +286,22 @@ def prepare_buildings(raw: dict) -> dict:
 
     raw["total"] = len(buildings)
     return raw
+# END_BLOCK_PREPARE_BUILDINGS
 
 
+# PURPOSE: Собрать сайт из data/ в dist/, чтобы публикация шла из единственного источника без ручной правки страниц.
+# INPUTS:
+#   нет: окружение — каталог data/ с JSON, templates/, assets/; SOURCE_DATE_EPOCH задаёт дату сборки.
+# OUTPUTS:
+#   нет: пишет dist/ со страницами, 404.html, assets/, sitemap.xml, robots.txt и .nojekyll.
+# ERRORS:
+#   SystemExit(1) — ошибки данных или изображений (через fail); TemplateError — ошибка шаблона.
+# SIDE EFFECTS: удаляет и пересоздаёт dist/, пишет файлы, печатает итог, ведёт журнал при NUKE_LOG.
+# POSTCONDITIONS: dist/ содержит PAGE_FILES + 404.html; при выключенном журнале вывод не меняется.
+# KEYWORDS: [Build, StaticSite, Templates, Dist, Sitemap]
+# TESTS: [T-BUILD-001, T-BUILD-002, T-BUILD-003, T-BUILD-004, T-BUILD-006, T-BUILD-012]
 def build() -> None:
+    # START_BLOCK_LOAD_DATA: Загрузка всех данных сайта и проверка изображений. #KEYWORDS: Load,Data,Turns,Assets
     site = load_json(DATA / "site.json")
     world = load_json(DATA / "world.json")
     history = load_json(DATA / "history.json")
@@ -191,11 +315,22 @@ def build() -> None:
 
     turn_files = sorted((DATA / "turns").glob("*.json"))
     if not turn_files:
+        log.event("LOAD_DATA", "build", "build.build", "error", level="ERROR", turns=0)
         fail("в data/turns нет ни одного хода")
     turns = prepare_turns([load_json(path) for path in turn_files])
 
     check_assets(turns, maps, tables)
+    log.event(
+        "LOAD_DATA",
+        "build",
+        "build.build",
+        "ok",
+        turns=len(turns),
+        events=sum(len(turn["events"]) for turn in turns),
+    )
+    # END_BLOCK_LOAD_DATA
 
+    # START_BLOCK_BUILD_CONTEXT: Подготовка контекста шаблонов. #KEYWORDS: Context,Stats,Jsonld,Templates
     latest = turns[-1]
     stats = {
         "turns": len(turns),
@@ -264,7 +399,17 @@ def build() -> None:
         "stats": stats,
         "build": build_info,
     }
+    log.event(
+        "BUILD_CONTEXT",
+        "build",
+        "build.build",
+        "ok",
+        type_stats=len(type_stats),
+        pages=len(PAGE_FILES),
+    )
+    # END_BLOCK_BUILD_CONTEXT
 
+    # START_BLOCK_RENDER_PAGES: Рендер всех страниц в dist/. #KEYWORDS: Render,Templates,Pages,Dist
     if DIST.exists():
         shutil.rmtree(DIST)
     DIST.mkdir(parents=True)
@@ -296,7 +441,17 @@ def build() -> None:
 
     not_found = templates.render("404.html", {**context, "page": {"id": "404"}})
     (DIST / "404.html").write_text(not_found, encoding="utf-8", newline="\n")
+    log.event(
+        "RENDER_PAGES",
+        "build",
+        "build.build",
+        "ok",
+        pages=len(pages),
+        not_found=1,
+    )
+    # END_BLOCK_RENDER_PAGES
 
+    # START_BLOCK_WRITE_DIST_SITEMAP: Запись ассетов, sitemap и robots в dist/. #KEYWORDS: Dist,Sitemap,Robots,Assets
     shutil.copytree(ASSETS, DIST / "assets", dirs_exist_ok=True)
 
     (DIST / ".nojekyll").write_text("", encoding="utf-8")
@@ -318,6 +473,15 @@ def build() -> None:
         encoding="utf-8",
         newline="\n",
     )
+    log.event(
+        "WRITE_DIST_SITEMAP",
+        "build",
+        "build.build",
+        "ok",
+        urls=len(PAGE_FILES),
+        assets="assets",
+    )
+    # END_BLOCK_WRITE_DIST_SITEMAP
 
     print(
         "Собрано: "
@@ -334,4 +498,5 @@ if __name__ == "__main__":
     try:
         build()
     except TemplateError as exc:
+        log.event("RENDER_PAGES", "build", "build.build", "error", level="ERROR", error=str(exc)[:160])
         fail(str(exc))
