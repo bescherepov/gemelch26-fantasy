@@ -66,12 +66,32 @@
       "height": 1003
     },
     {
+      "id": "political-925",
+      "category": "political",
+      "title": "Политическая карта после 6-го хода",
+      "caption": "Мир в 925 году: границы государств и городов после 6-го хода.",
+      "file": "assets/img/map-political-925.png",
+      "source_file": "6khod_karta.png",
+      "width": 804,
+      "height": 1003
+    },
+    {
       "id": "political-930",
       "category": "political",
       "title": "Политическая карта после 7-го хода",
       "caption": "Мир в 930 году: границы государств и городов после 7-го хода.",
       "file": "assets/img/map-political-930.png",
       "source_file": "7khod_karta.png",
+      "width": 804,
+      "height": 1082
+    },
+    {
+      "id": "political-935",
+      "category": "political",
+      "title": "Политическая карта после 8-го хода",
+      "caption": "Мир в 935 году: границы государств и городов после 8-го хода.",
+      "file": "assets/img/map-political-935.png",
+      "source_file": "8khod_karta.png",
       "width": 804,
       "height": 1082
     }
