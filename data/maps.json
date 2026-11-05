@@ -56,6 +56,16 @@
       "height": 1003
     },
     {
+      "id": "political-920",
+      "category": "political",
+      "title": "Политическая карта после 5-го хода",
+      "caption": "Мир в 920 году: границы государств и городов после 5-го хода.",
+      "file": "assets/img/map-political-920.png",
+      "source_file": "5khod_karta.png",
+      "width": 804,
+      "height": 1003
+    },
+    {
       "id": "political-930",
       "category": "political",
       "title": "Политическая карта после 7-го хода",
