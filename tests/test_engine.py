@@ -106,6 +106,17 @@ class Filters(unittest.TestCase):
     def test_number(self):
         self.assertEqual(render("{{ n | number }}", {"n": 1234}), "1 234")
 
+    def test_plural(self):
+        source = '{{ n }} {{ n | plural("событие", "события", "событий") }}'
+        cases = {1: "1 событие", 2: "2 события", 4: "4 события", 5: "5 событий",
+                 11: "11 событий", 21: "21 событие", 57: "57 событий"}
+        for number, expected in cases.items():
+            self.assertEqual(render(source, {"n": number}), expected)
+
+    def test_plural_needs_three_forms(self):
+        with self.assertRaises(TemplateError):
+            render('{{ n | plural("событие") }}', {"n": 1})
+
 
 class Includes(unittest.TestCase):
     def test_include(self):

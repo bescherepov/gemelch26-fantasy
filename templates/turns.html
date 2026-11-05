@@ -80,7 +80,7 @@
 <section class="section section--band">
   <p class="kicker">Итоги</p>
   <h2>Хроника в цифрах</h2>
-  <p class="section__lead">{{ stats.events }} событий в хронике {{ stats.years }} годов. Распределение по типам собирается из тех же данных, что и страницы ходов, — вручную эти числа не ведутся.</p>
+  <p class="section__lead">{{ stats.events }} {{ stats.events | plural("событие", "события", "событий") }} в хронике {{ stats.years }} годов. Распределение по типам собирается из тех же данных, что и страницы ходов, — вручную эти числа не ведутся.</p>
   <ul class="bars">
     {% for item in type_stats %}
     <li>

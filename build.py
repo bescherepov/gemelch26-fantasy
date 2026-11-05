@@ -15,7 +15,7 @@ import sys
 from datetime import date, datetime
 from pathlib import Path
 
-from engine import Safe, TemplateError, TemplateSet
+from engine import Safe, TemplateError, TemplateSet, plural_ru
 
 ROOT = Path(__file__).resolve().parent
 DATA = ROOT / "data"
@@ -56,12 +56,7 @@ def fail(message: str) -> None:
 
 
 def plural(number: int, one: str, few: str, many: str) -> str:
-    tail, hundred = number % 10, number % 100
-    if tail == 1 and hundred != 11:
-        return one
-    if 2 <= tail <= 4 and not 12 <= hundred <= 14:
-        return few
-    return many
+    return plural_ru(number, one, few, many)
 
 
 def load_json(path: Path):
@@ -225,7 +220,7 @@ def build() -> None:
     )
 
     hero_map = next(
-        (item for item in maps["maps"] if item["id"] == "political-905"),
+        (item for item in maps["maps"] if item["id"] == "political-915"),
         maps["maps"][0],
     )
     preview_maps = maps["maps"][:3]

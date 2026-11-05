@@ -7,7 +7,8 @@
     {% if условие %} … {% elif … %} … {% else %} … {% endif %}
     {% include "partial.html" %}
 
-Фильтры: safe, upper, lower, join(", "), default("—"), date_ru, number, length.
+Фильтры: safe, upper, lower, join(", "), default("—"), date_ru, number, length,
+plural("ход", "хода", "ходов").
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ import html
 import re
 from pathlib import Path
 
-__all__ = ["TemplateError", "Template", "TemplateSet", "Safe"]
+__all__ = ["TemplateError", "Template", "TemplateSet", "Safe", "plural_ru"]
 
 
 class TemplateError(Exception):
@@ -157,6 +158,36 @@ def _split_filters(expr: str) -> list[str]:
     return parts
 
 
+def _split_args(raw: str) -> list[str]:
+    """Делит аргументы фильтра по запятым вне кавычек."""
+    parts, buf, quote = [], [], None
+    for char in raw:
+        if quote:
+            buf.append(char)
+            if char == quote:
+                quote = None
+        elif char in "\"'":
+            quote = char
+            buf.append(char)
+        elif char == ",":
+            parts.append("".join(buf).strip())
+            buf = []
+        else:
+            buf.append(char)
+    parts.append("".join(buf).strip())
+    return [part for part in parts if part]
+
+
+def plural_ru(number: int, one: str, few: str, many: str) -> str:
+    """Русская форма слова по числу: 1 событие, 2 события, 5 событий."""
+    tail, hundred = number % 10, number % 100
+    if tail == 1 and hundred != 11:
+        return one
+    if 2 <= tail <= 4 and not 12 <= hundred <= 14:
+        return few
+    return many
+
+
 def _unquote(text: str):
     text = text.strip()
     if len(text) >= 2 and text[0] == text[-1] and text[0] in "\"'":
@@ -214,6 +245,11 @@ def _apply_filter(name: str, arg: str | None, value):
         return f"{parsed.day} {_MONTHS[parsed.month - 1]} {parsed.year}"
     if name == "number":
         return f"{int(value):,}".replace(",", " ")
+    if name == "plural":
+        forms = [_unquote(part) for part in _split_args(arg or "")]
+        if len(forms) != 3:
+            raise TemplateError("фильтр plural требует три формы: одна, две, много")
+        return plural_ru(int(value), *forms)
     raise TemplateError(f"неизвестный фильтр {name!r}")
 
 

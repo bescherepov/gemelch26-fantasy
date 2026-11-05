@@ -44,6 +44,16 @@
       "source_file": "2khod.png",
       "width": 804,
       "height": 1003
+    },
+    {
+      "id": "political-915",
+      "category": "political",
+      "title": "Политическая карта после 4-го хода",
+      "caption": "Мир в 915 году: границы государств и городов после 4-го хода.",
+      "file": "assets/img/map-political-915.png",
+      "source_file": "4khod_karta.png",
+      "width": 804,
+      "height": 1003
     }
   ]
 }

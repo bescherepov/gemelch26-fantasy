@@ -45,7 +45,7 @@
       <p class="kicker">Хроника</p>
       <h2>Пять лет за ход</h2>
     </div>
-    <span class="section__note">{{ stats.turns }} хода · {{ stats.events }} событий</span>
+    <span class="section__note">{{ stats.turns }} {{ stats.turns | plural("ход", "хода", "ходов") }} · {{ stats.events }} {{ stats.events | plural("событие", "события", "событий") }}</span>
   </header>
   <ol class="strip">
     {% for t in turns %}
@@ -53,7 +53,7 @@
       <a href="turns.html#turn-{{ t.number }}">
         <span class="strip__year">{{ t.year }}</span>
         <strong>{{ t.title }}</strong>
-        <span class="strip__meta">Ход {{ t.number }} · {{ t.events | length }} событий</span>
+        <span class="strip__meta">Ход {{ t.number }} · {{ t.events | length }} {{ t.events | length | plural("событие", "события", "событий") }}</span>
       </a>
     </li>
     {% endfor %}
