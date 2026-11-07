@@ -2,7 +2,7 @@
 # PURPOSE:   Проверять, что модуль changelog безопасно читает историю git и сливает записи без дублей, с сортировкой и лимитом.
 # SCOPE:     normalize, run_git, git_entries и main на временных файлах и подменённом git.
 # NON-GOALS: Не ходить в реальную историю репозитория, не менять рабочий data/changelog.json, не собирать сайт.
-# INVARIANTS:каждый тест изолирован временным каталогом; рабочий data/ не изменяется; подмены снимаются в tearDown.
+# INVARIANTS:каждый тест изолирован временным каталогом; рабочий data/ не изменяется; подмены и переменные окружения снимаются в tearDown; проверка отсутствия репозитория задаёт GIT_CEILING_DIRECTORIES, чтобы не зависеть от расположения временного каталога.
 # DEPENDS:   changelog:normalize, changelog:git_entries, changelog:main
 # EXPOSES:   ChangelogTest, ChangelogMainTest
 # ERRORS:    нет
