@@ -1,20 +1,22 @@
 #!/usr/bin/env python3
 # ==== MODULE CONTRACT: build ====
 # PURPOSE:   Собирать статический сайт хроники из data/ в dist/, чтобы публикация шла из единственного источника без сети и внешних пакетов.
-# SCOPE:     загрузка JSON, подготовка ходов и построек, статистика типов, проверка изображений, контекст шаблонов, рендер страниц, запись dist/, sitemap и robots.
+# SCOPE:     загрузка JSON, подготовка ходов, построек и таблиц, статистика типов, проверка изображений, контекст шаблонов, рендер страниц, запись dist/, sitemap и robots.
 # NON-GOALS: не хранить игровой контент и не проверять его полноту (scripts/validate.py), не публиковать сайт (CI), не писать журнал при выключенном NUKE_LOG.
 # INVARIANTS:dist/ — производное от data/, templates/ и assets/; сборка без сети, случайности и текущего времени в контенте (дата — только подвал и sitemap); при выключенном журнале вывод и dist/ не меняются.
 # DEPENDS:   engine:TemplateSet, data:*, templates:*, site-css:*, site-js:*, assets-img:*, nuke-log:EventLogger
-# EXPOSES:   build, prepare_turns, prepare_buildings, build_type_stats, check_assets, load_json, fail, plural, TYPE_LABELS, PAGE_FILES, FACT_FIELDS
+# EXPOSES:   build, prepare_turns, prepare_buildings, prepare_tables, build_type_stats, check_assets, load_json, fail, plural, TYPE_LABELS, PAGE_FILES, BUILDING_DETAIL_FIELDS, HEAT_LEVELS
 # ERRORS:    SystemExit(1) — нет файла данных, битый JSON или отсутствующее изображение; TemplateError — ошибка шаблона.
-# TESTS:     T-BUILD-001, T-BUILD-002, T-BUILD-003, T-BUILD-004, T-BUILD-005, T-BUILD-006, T-BUILD-007, T-BUILD-008, T-BUILD-009, T-BUILD-010, T-BUILD-011, T-BUILD-012
+# TESTS:     T-BUILD-001, T-BUILD-002, T-BUILD-003, T-BUILD-004, T-BUILD-005, T-BUILD-006, T-BUILD-007, T-BUILD-008, T-BUILD-009, T-BUILD-010, T-BUILD-011, T-BUILD-012, T-BUILD-013, T-BUILD-014, T-BUILD-015, T-BUILD-016, T-BUILD-017
 # ==== END MODULE CONTRACT: build ====
 """Собрать сайт «Расфадаль» из data/ в dist/ без внешних зависимостей и сети."""
 
 from __future__ import annotations
 
 import json
+import math
 import os
+import re
 import shutil
 import sys
 from datetime import date, datetime
@@ -219,36 +221,114 @@ def check_assets(turns: list[dict], maps: dict, tables: dict) -> None:
 # END_BLOCK_CHECK_ASSETS
 
 
-# PURPOSE: Перечислить поля построек, попадающие в карточку, чтобы порядок фактов задавался данными, а не шаблоном.
-# KEYWORDS: [Buildings, Facts, Labels, Catalog]
-# TESTS: [T-BUILD-007]
-FACT_FIELDS = (
-    ("cost", "Стоимость"),
-    ("income", "Доход"),
-    ("base", "Производство"),
+# PURPOSE: Задать поля, которые уходят в раскрываемые подробности строки таблицы, чтобы шаблон не придумывал подписи.
+# KEYWORDS: [Buildings, Details, Labels, Catalog, Table]
+# TESTS: [T-BUILD-007, T-BUILD-014]
+BUILDING_DETAIL_FIELDS = (
     ("input", "Сырьё"),
-    ("conditions", "Требования"),
-    ("resource", "Ресурс"),
-    ("location", "Где"),
     ("climate", "Климат"),
     ("terrain", "Местность"),
     ("bonuses", "Инновации и традиции"),
 )
 
+# PURPOSE: Задать число уровней тепловой раскраски числовых таблиц, чтобы товары и цены читались как на старом сайте.
+# KEYWORDS: [Heatmap, Levels, Cells, Tables]
+# TESTS: [T-BUILD-015, T-BUILD-016]
+HEAT_LEVELS = 6
 
-# START_BLOCK_PREPARE_BUILDINGS: Подготовка каталога построек. #KEYWORDS: Buildings,Categories,Rules,Facts
-# PURPOSE: Разложить постройки по категориям и связать их с местными правилами и полями карточки, чтобы шаблон не искал связи сам.
+
+# PURPOSE: Подставить прочерк в пустую ячейку таблицы, чтобы строка не выглядела сломанной.
+# INPUTS:
+#   value: str — значение поля постройки; может быть пустым или «—».
+# OUTPUTS:
+#   str — исходный текст либо «—».
+# ERRORS: нет.
+# KEYWORDS: [Buildings, Fallback, Cell, Table]
+# TESTS: [T-BUILD-013]
+def _fallback(value: str) -> str:
+    text = value.strip()
+    return text if text and text != "—" else "—"
+
+
+# PURPOSE: Отличить содержательное поле от пустого и всеобщего, чтобы не засорять раскрываемые подробности.
+# INPUTS:
+#   value: str — значение поля постройки.
+# OUTPUTS:
+#   bool — True, если поле стоит показывать.
+# ERRORS: нет.
+# KEYWORDS: [Buildings, Details, Filter, Cell]
+# TESTS: [T-BUILD-014]
+def _visible(value: str) -> bool:
+    text = value.strip()
+    return bool(text) and text != "—" and text.lower() != "все"
+
+
+# PURPOSE: Вытащить первое число из текста, чтобы сортировать строки по цене и базовому доходу.
+# INPUTS:
+#   value: str — значение вида «17,5», «1+1(Овцы/Меринос)», «0, эмиссия…».
+# OUTPUTS:
+#   str — число с точкой в качестве разделителя или пустая строка, если числа нет.
+# ERRORS: нет: отсутствие числа даёт пустую строку, а не исключение.
+# KEYWORDS: [Buildings, Number, Sort, Parse]
+# TESTS: [T-BUILD-014]
+def _first_number(value: str) -> str:
+    match = re.search(r"-?\d+(?:[.,]\d+)?", value)
+    return match.group(0).replace(",", ".") if match else ""
+
+
+# PURPOSE: Отнести цену к диапазону старого справочника, чтобы таблица читалась по цвету.
+# INPUTS:
+#   value: str — числовая строка цены; пустая допустима.
+# OUTPUTS:
+#   str — CSS-класс диапазона или пустая строка.
+# ERRORS: ValueError, если строка не число; вызывающий код передаёт только результат _first_number.
+# KEYWORDS: [Buildings, Cost, Range, Class]
+# TESTS: [T-BUILD-014]
+def _cost_class(value: str) -> str:
+    if not value:
+        return ""
+    number = float(value)
+    if number <= 15:
+        return "cost-cheap"
+    if number < 40:
+        return "cost-mid"
+    return "cost-expensive"
+
+
+# PURPOSE: Отнести доход к диапазону, чтобы таблица показывала убыточные и доходные постройки.
+# INPUTS:
+#   value: str — числовая строка дохода; пустая допустима.
+# OUTPUTS:
+#   str — CSS-класс диапазона или пустая строка.
+# ERRORS: ValueError, если строка не число; вызывающий код передаёт только результат _first_number.
+# KEYWORDS: [Buildings, Income, Range, Class]
+# TESTS: [T-BUILD-014]
+def _income_class(value: str) -> str:
+    if not value:
+        return ""
+    number = float(value)
+    if number < 0:
+        return "income-negative"
+    if number <= 2:
+        return "income-low"
+    if number <= 4:
+        return "income-mid"
+    return "income-high"
+
+
+# START_BLOCK_PREPARE_BUILDINGS: Подготовка каталога построек. #KEYWORDS: Buildings,Categories,Rules,Table
+# PURPOSE: Разложить постройки по категориям, связать с местными правилами и собрать ячейки таблицы, чтобы шаблон только выводил готовые значения.
 # INPUTS:
 #   raw: dict — buildings.json с ключами buildings/changes/categories; id уникальны.
 # OUTPUTS:
-#   dict — тот же объект: у правил items, у построек local/has_group/facts, у категорий items/count, total — число построек.
+#   dict — тот же объект: у правил items, у построек local/variant/requirements/cost_display/income_display/base_display/cost_value/income_value/cost_class/income_class/details, у категорий items/count, total — число построек.
 # ERRORS:
 #   SystemExit(1) — правило ссылается на неизвестную постройку или у постройки неизвестное правило; перед выходом пишется событие outcome="error".
 # PRECONDITIONS: buildings.json уже прочитан; все постройки имеют непустой name.
-# KEYWORDS: [Buildings, Categories, LocalRule, Facts, Catalog]
-# TESTS: [T-BUILD-007, T-BUILD-008]
+# KEYWORDS: [Buildings, Categories, LocalRule, Table, Values]
+# TESTS: [T-BUILD-007, T-BUILD-008, T-BUILD-013, T-BUILD-014]
 def prepare_buildings(raw: dict) -> dict:
-    """Раскладывает постройки по категориям и связывает их с местными правилами."""
+    """Раскладывает постройки по категориям и готовит значения строк таблицы."""
     buildings = raw["buildings"]
     by_id = {building["id"]: building for building in buildings}
     changes = {change["id"]: change for change in raw["changes"]}
@@ -268,14 +348,26 @@ def prepare_buildings(raw: dict) -> dict:
             log.event("PREPARE_BUILDINGS", "build", "build.prepare_buildings", "error", level="ERROR", building=building["id"])
             fail(f"buildings.json: у постройки «{building['name']}» неизвестное правило «{rule}»")
         building["local"] = changes.get(rule) if rule else None
-        building["has_group"] = bool(building["group"]) and building["group"] != building["name"]
-        building["facts"] = [
+        resource = building["resource"].strip()
+        group = building["group"].strip()
+        if resource and resource != "нет":
+            building["variant"] = resource
+        elif group and group != building["name"]:
+            building["variant"] = group
+        else:
+            building["variant"] = "—"
+        building["requirements"] = _fallback(building["conditions"])
+        building["cost_display"] = _fallback(building["cost"])
+        building["income_display"] = _fallback(building["income"])
+        building["base_display"] = _fallback(building["base"])
+        building["cost_value"] = _first_number(building["cost"])
+        building["income_value"] = _first_number(building["income"])
+        building["cost_class"] = _cost_class(building["cost_value"])
+        building["income_class"] = _income_class(building["income_value"])
+        building["details"] = [
             {"label": label, "value": building[key].strip()}
-            for key, label in FACT_FIELDS
-            if building[key].strip()
-            and building[key].strip() != "—"
-            and not (key == "resource" and building[key].strip() == "нет")
-            and not (key in ("climate", "terrain") and building[key].strip().lower() == "все")
+            for key, label in BUILDING_DETAIL_FIELDS
+            if _visible(building[key])
         ]
 
     for category in raw["categories"]:
@@ -287,6 +379,71 @@ def prepare_buildings(raw: dict) -> dict:
     raw["total"] = len(buildings)
     return raw
 # END_BLOCK_PREPARE_BUILDINGS
+
+
+# START_BLOCK_PREPARE_TABLES: Подготовка числовых таблиц к рендеру. #KEYWORDS: Tables,Matrix,Heatmap,Cells
+# PURPOSE: Собрать для числовых матриц колонки, строки и уровни тепловой раскраски, чтобы шаблон не считал числа сам.
+# INPUTS:
+#   raw: dict — tables.json с ключом tables; у матричных таблиц layout="matrix", есть columns и rows.
+# OUTPUTS:
+#   dict — тот же объект: у матричных таблиц поле matrix с колонками и строками {label, cells:[{value, level}]}.
+# ERRORS:
+#   SystemExit(1) — у матрицы меньше двух колонок, строка не совпадает по длине или нет раскрашиваемых чисел; перед выходом пишется событие outcome="error".
+# PRECONDITIONS: tables.json уже прочитан; ячейки матрицы непустые.
+# POSTCONDITIONS: level каждой ячейки лежит в диапазоне 0..HEAT_LEVELS-1; пустая матрица даёт пустой matrix.
+# KEYWORDS: [Tables, Matrix, Heatmap, Cells, Goods]
+# TESTS: [T-BUILD-015, T-BUILD-016]
+def prepare_tables(raw: dict) -> dict:
+    """Готовит числовые матрицы товаров и цен: значения и уровни раскраски по колонкам."""
+    for table in raw["tables"]:
+        if table.get("layout") != "matrix":
+            continue
+        columns = table["columns"]
+        rows = table["rows"]
+        if len(columns) < 2:
+            log.event("PREPARE_TABLES", "build", "build.prepare_tables", "error", level="ERROR", table=table["id"])
+            fail(f"tables.json: у матрицы «{table['id']}» меньше двух колонок")
+        width = len(columns) - 1
+        for index, row in enumerate(rows):
+            if len(row) != len(columns):
+                log.event("PREPARE_TABLES", "build", "build.prepare_tables", "error", level="ERROR", table=table["id"], row=index)
+                fail(
+                    f"tables.json: у матрицы «{table['id']}» строка {index + 1} содержит "
+                    f"{len(row)} ячеек вместо {len(columns)}"
+                )
+        values = [
+            [float(_first_number(row[column + 1])) for row in rows]
+            for column in range(width)
+        ]
+        scale = table.get("heat", "linear")
+        levels = []
+        for column in range(width):
+            numbers = values[column]
+            scaled = [math.log1p(number) for number in numbers] if scale == "log" else numbers
+            low = min(scaled)
+            high = max(scaled)
+            levels.append(
+                [
+                    0 if high == low else round((number - low) / (high - low) * (HEAT_LEVELS - 1))
+                    for number in scaled
+                ]
+            )
+        raw["has_matrix"] = True
+        table["matrix"] = {
+            "columns": columns[1:],
+            "rows": [
+                {
+                    "label": row[0],
+                    "cells": [
+                        {"value": row[column + 1], "level": levels[column][index]}
+                        for column in range(width)
+                    ],
+                }
+                for index, row in enumerate(rows)
+            ],
+        }
+    return raw
+# END_BLOCK_PREPARE_TABLES
 
 
 # PURPOSE: Собрать сайт из data/ в dist/, чтобы публикация шла из единственного источника без ручной правки страниц.
@@ -307,7 +464,7 @@ def build() -> None:
     history = load_json(DATA / "history.json")
     ethnoses = load_json(DATA / "ethnoses.json")
     maps = load_json(DATA / "maps.json")
-    tables = load_json(DATA / "tables.json")
+    tables = prepare_tables(load_json(DATA / "tables.json"))
     buildings = prepare_buildings(load_json(DATA / "buildings.json"))
     links = load_json(DATA / "links.json")
     participants = load_json(DATA / "participants.json")

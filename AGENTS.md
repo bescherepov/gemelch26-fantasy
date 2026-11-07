@@ -19,7 +19,7 @@
 Полная архитектура — в [CONCEPT.md](CONCEPT.md), быстрый старт — в [README.md](README.md).
 
 Текущее состояние: 8 ходов, 126 событий, 9 народов, 9 карт, 137 построек,
-11 страниц, 83 теста.
+11 страниц, 91 тест.
 
 ---
 
@@ -96,7 +96,7 @@ gemelch26-fantasy/
 | `ethnoses.json` | народы | `ethnoses[].id/name/color/epithet/analog/geography/description` |
 | `turns/NNN.json` | ход | `number`, `year`, `title`, `lead`, `events[]` |
 | `maps.json` | карты | `categories[]`, `maps[].id/category/title/caption/file` |
-| `tables.json` | таблицы | `tables[].id/title/caption` + `file` либо `columns[]`/`rows[][]` |
+| `tables.json` | таблицы | `tables[].id/title/caption` + `file` либо `columns[]`/`rows[][]`; матрицы — `layout: "matrix"`, `heat`, источник-`file` |
 | `buildings.json` | постройки | `buildings[].id/name/category/location`, `changes[].id` |
 | `participants.json` | рассадка | `title`, `intro`, `count`, `image`, `notes[]` |
 | `links.json` | ссылки | `links[].id/title/url/description` |
@@ -180,12 +180,22 @@ gemelch26-fantasy/
 место в рейтинге выводится по порядку строк. Валидатор проверит, что колонки
 и ячейки заполнены, а число ячеек в каждой строке совпадает.
 
+### Добавить числовую матрицу (товары, цены)
+
+Таблица-матрица — это строки-товары и числовые колонки-города, перенесённые
+с изображения мастера. У записи укажи `layout: "matrix"`, `heat: "log"` для
+количеств или `heat: "linear"` для цен, `columns` (первая — подпись строк,
+остальные — города) и `rows` (первая ячейка — товар, дальше числа строками).
+Файл-источник остаётся у записи: он открывается под таблицей. Валидатор
+проверит числа, уникальность подписей строк и ширину строк, а сборка посчитает
+уровни тепловой раскраски по колонкам.
+
 ### Добавить постройку
 
 Запись в `data/buildings.json → buildings[]` с уникальным `id` и объявленной
 категорией. Если на постройку действует местное правило партии, укажи
 `local_rule` с `id` из `changes[]` — правило должно ссылаться на неё же.
-Перекрёстные ссылки проверяет валидатор, карточка и поиск обновятся сами.
+Перекрёстные ссылки проверяет валидатор, строка таблицы и поиск обновятся сами.
 
 ### Добавить народ
 
@@ -223,7 +233,7 @@ gemelch26-fantasy/
 
 ```bash
 python scripts/validate.py            # данные
-python -m unittest discover -s tests  # 83 теста движка, сборки и NUKE
+python -m unittest discover -s tests  # 91 тест движка, сборки и NUKE
 python build.py                       # dist/
 python scripts/validate.py --dist     # ссылки, якоря, h1, meta
 python scripts/nuke_audit.py          # контракты, якоря, граф, логи

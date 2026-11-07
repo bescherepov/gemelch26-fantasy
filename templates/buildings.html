@@ -13,7 +13,7 @@
       <h2>Что изменилось в этой партии</h2>
     </div>
   </header>
-  <p class="section__lead">Эти семь правил отличают Расфадаль от прошлой партии. Они уже учтены в карточках — ищите значок «Местное правило».</p>
+  <p class="section__lead">Эти правила отличают Расфадаль от прошлой партии. Они уже учтены в таблице — ищите значок «Местное правило».</p>
   <ol class="changes">
     {% for change in buildings.changes %}
     <li class="change" id="change-{{ change.id }}">
@@ -50,24 +50,51 @@
     <span class="section__note">{{ category.count }}&nbsp;шт.</span>
   </header>
   <p class="section__lead">{{ category.intro }}</p>
-  <div class="buildings">
-    {% for b in category.items %}
-    <article class="building" id="b-{{ b.id }}" data-category="{{ category.id }}">
-      <header class="building__head">
-        <h3 class="building__name">{{ b.name }}</h3>
-        {% if b.local %}<a class="building__flag" href="#change-{{ b.local.id }}" title="{{ b.local.title }}">Местное правило</a>{% endif %}
-      </header>
-      {% if b.has_group %}<p class="building__group">Вариант постройки «{{ b.group }}»</p>{% endif %}
-      <dl class="building__facts">
-        {% for fact in b.facts %}
-        <div class="building__fact">
-          <dt>{{ fact.label }}</dt>
-          <dd>{{ fact.value }}</dd>
-        </div>
+  <div class="bldg-table" data-buildings-table>
+    <table class="bldg-table__table">
+      <caption>{{ category.title }}: варианты, цена, доход и производство</caption>
+      <thead>
+        <tr>
+          <th scope="col" data-sort="name" data-sort-type="text">Постройка</th>
+          <th scope="col">Где</th>
+          <th scope="col">Вариант</th>
+          <th scope="col">Требования</th>
+          <th scope="col" class="bldg-table__num" data-sort="cost" data-sort-type="number">Цена</th>
+          <th scope="col" class="bldg-table__num" data-sort="income" data-sort-type="number">Доход</th>
+          <th scope="col">Производство</th>
+          <th scope="col"><span class="sr-only">Подробности</span></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for b in category.items %}
+        <tr class="bldg" id="b-{{ b.id }}" data-name="{{ b.name }}" data-cost="{{ b.cost_value }}" data-income="{{ b.income_value }}">
+          <th scope="row" class="bldg__name">
+            <span class="bldg__title">{{ b.name }}</span>
+            {% if b.local %}<a class="bldg__flag" href="#change-{{ b.local.id }}" title="{{ b.local.title }}">Местное правило</a>{% endif %}
+          </th>
+          <td>{{ b.location }}</td>
+          <td>{{ b.variant }}</td>
+          <td class="bldg__req">{{ b.requirements }}</td>
+          <td class="bldg__num {{ b.cost_class }}">{{ b.cost_display }}</td>
+          <td class="bldg__num {{ b.income_class }}">{{ b.income_display }}</td>
+          <td class="bldg__base">{{ b.base_display }}</td>
+          <td class="bldg__more">
+            {% if b.details %}
+            <details>
+              <summary>Подробнее</summary>
+              <dl>
+                {% for fact in b.details %}
+                <dt>{{ fact.label }}</dt>
+                <dd>{{ fact.value }}</dd>
+                {% endfor %}
+              </dl>
+            </details>
+            {% else %}—{% endif %}
+          </td>
+        </tr>
         {% endfor %}
-      </dl>
-    </article>
-    {% endfor %}
+      </tbody>
+    </table>
   </div>
 </section>
 {% endfor %}

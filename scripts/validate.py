@@ -379,17 +379,30 @@ def check_gallery() -> tuple[dict | None, dict | None]:
     return maps, tables
 
 
-# PURPOSE: Проверить таблицу без картинки, чтобы число ячеек в строке совпадало с числом колонок.
+# PURPOSE: Проверить, что ячейка матрицы — число в формате источника: целое или дробное с запятой.
 # INPUTS:
-#   item: dict — запись data/tables.json; where: str — адрес для сообщения.
+#   value: str — текст ячейки; не пустой.
+# OUTPUTS:
+#   bool — True, если текст является числом.
+# ERRORS: нет.
+# KEYWORDS: [Matrix, Number, Cell, Format]
+# TESTS: [T-VALIDATE-010]
+def _is_number(value: str) -> bool:
+    return re.match(r"^-?\d+(?:[.,]\d+)?$", value.strip()) is not None
+
+
+# PURPOSE: Проверить таблицу данных, чтобы число ячеек в строке совпадало с числом колонок, а матрица товаров состояла из чисел.
+# INPUTS:
+#   item: dict — запись data/tables.json; у матриц layout="matrix" и есть file-источник; where: str — адрес для сообщения.
 # OUTPUTS:
 #   None — ошибки добавляются в errors.
 # ERRORS: нет.
-# KEYWORDS: [Table, Columns, Rows, Cells]
-# TESTS: [T-VALIDATE-001]
+# KEYWORDS: [Table, Columns, Rows, Cells, Matrix]
+# TESTS: [T-VALIDATE-001, T-VALIDATE-009, T-VALIDATE-010, T-VALIDATE-011]
 def check_table_part(item: dict, where: str) -> None:
-    """Таблица без картинки: колонки и строки с одинаковым числом ячеек."""
-    if item.get("file"):
+    """Таблица: источник-файл, колонки и строки; числовая матрица — числа и уникальные подписи строк."""
+    matrix = item.get("layout") == "matrix"
+    if item.get("file") and not matrix:
         if item.get("rows") or item.get("columns"):
             err(f"{where}: таблица либо файл, либо строки — не оба сразу")
         return
@@ -405,13 +418,27 @@ def check_table_part(item: dict, where: str) -> None:
     if not isinstance(rows, list) or not rows:
         err(f"{where}: нужен непустой rows")
         return
+    if matrix and len(columns) < 2:
+        err(f"{where}: у матрицы нужны колонка подписи и хотя бы одна колонка чисел")
+        return
     for row_index, row in enumerate(rows):
         if not isinstance(row, list) or len(row) != len(columns):
             err(f"{where} → rows[{row_index}]: ожидалось {len(columns)} ячеек")
             continue
-        for cell in row:
+        for cell_index, cell in enumerate(row):
             if not isinstance(cell, str) or not cell.strip():
                 err(f"{where} → rows[{row_index}]: пустая ячейка")
+                continue
+            if matrix and cell_index > 0 and not _is_number(cell):
+                err(f"{where} → rows[{row_index}][{cell_index}]: в матрице ожидалось число, получено «{cell}»")
+    if matrix:
+        labels = [row[0] for row in rows if isinstance(row, list) and row]
+        duplicates = sorted({label for label in labels if labels.count(label) > 1})
+        for label in duplicates:
+            err(f"{where}: повторяющаяся подпись строки матрицы «{label}»")
+        scale = item.get("heat", "linear")
+        if scale not in ("log", "linear"):
+            err(f"{where}: heat должен быть log или linear, получено «{scale}»")
 # END_BLOCK_GALLERY_CHECKS
 
 

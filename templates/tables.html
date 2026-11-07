@@ -2,6 +2,9 @@
   <p class="kicker">Справочник</p>
   <h1>Таблицы</h1>
   <p class="lead">{{ tables.intro }}</p>
+  {% if tables.has_matrix %}
+  <p class="table-legend">Товары и цены собраны из изображений мастера в числовые таблицы. Фон ячейки показывает место значения внутри своего столбца: светлее — меньше, темнее — больше.</p>
+  {% endif %}
 </header>
 
 <div class="tables">
@@ -17,7 +20,35 @@
       <p>{{ table.caption }}</p>
       {% if table.note %}<p class="shot__meta">{{ table.note }}</p>{% endif %}
     </figcaption>
-    {% if table.rows %}
+    {% if table.matrix %}
+    <div class="matrix-table">
+      <table>
+        <caption class="sr-only">{{ table.title }}: {{ table.caption }}</caption>
+        <thead>
+          <tr>
+            <th scope="col">Товар</th>
+            {% for column in table.matrix.columns %}<th scope="col" class="matrix-table__num">{{ column }}</th>{% endfor %}
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in table.matrix.rows %}
+          <tr>
+            <th scope="row">{{ row.label }}</th>
+            {% for cell in row.cells %}<td class="matrix-table__num heat-{{ cell.level }}">{{ cell.value }}</td>{% endfor %}
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if table.file %}
+    <details class="matrix-table__source">
+      <summary>Исходное изображение мастера</summary>
+      <a href="{{ table.file }}" target="_blank" rel="noopener">
+        <img src="{{ table.file }}" alt="{{ table.title }}" loading="lazy">
+      </a>
+    </details>
+    {% endif %}
+    {% elif table.rows %}
     <div class="rank-table">
       <table>
         <thead>

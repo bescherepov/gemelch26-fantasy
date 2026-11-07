@@ -30,7 +30,7 @@ data/*.json ──► validate ──► build.py ──► dist/ ──► GitH
 | Нет предпросмотра | PR получает собранный артефакт |
 | Публикация — пуш в ветку сайта | Публикация — стандартный Pages-деплой |
 
-Текущий объём: **4 хода, 57 событий, 9 народов, 5 карт, 136 построек, 11 страниц**. Сборка — меньше секунды, зависимостей — ноль.
+Текущий объём: **8 ходов, 126 событий, 9 народов, 9 карт, 137 построек, 11 страниц**. Сборка — меньше секунды, зависимостей — ноль.
 
 ---
 
@@ -126,7 +126,7 @@ data/*.json ──► validate ──► build.py ──► dist/ ──► GitH
 | `ethnoses.json` | девять народов | `id`, `color`, `epithet`, `analog`, `geography`, `description`, `status` |
 | `turns/NNN.json` | один ход: год, название, карта, события | `number`, `year`, `title`, `lead`, `map`, `events[]` |
 | `maps.json` | каталог карт и разделов | `categories[]`, `maps[].file` |
-| `tables.json` | игровые таблицы | `tables[].id/title/caption` + `file` либо `columns[]`/`rows[][]` |
+| `tables.json` | игровые таблицы | `tables[].id/title/caption` + `file` либо `columns[]`/`rows[][]`; числовые матрицы — `layout: matrix`, `heat`, `file`-источник |
 | `buildings.json` | постройки и местные правила | `buildings[].id`, `changes[].id` |
 | `participants.json` | рассадка | `count`, `image`, `notes[]` |
 | `links.json` | внешние ссылки | `links[].url` |
@@ -209,7 +209,7 @@ maps.json → maps[2]: нет файла assets/img/map-915.png
 4. рендерит страницы шаблонами;
 5. копирует `assets/` в `dist/`;
 6. пишет `sitemap.xml`, `robots.txt`, `.nojekyll`, `404.html`;
-7. печатает сводку: `Собрано: 11 страниц, 4 хода, 57 событий…`.
+7. печатает сводку: `Собрано: 11 страниц, 8 ходов, 126 событий…`.
 
 `dist/` каждый раз создаётся заново. Это гарантирует, что в публикацию не попадёт забытый файл.
 
@@ -366,7 +366,7 @@ gemelch26-fantasy/
 | `ethnoses.html` | девять карточек народов с цветами карты | `ethnoses.json` |
 | `turns.html` | переключатель ходов, поиск по всей хронике, фильтр по типам, переходы между ходами, статистика событий | `turns/*.json` |
 | `maps.html` | галерея карт с фильтром по разделам | `maps.json` |
-| `tables.html` | игровые таблицы | `tables.json` |
+| `tables.html` | картинки мастера, рейтинги и числовые матрицы товаров и цен | `tables.json` |
 | `buildings.html` | справочник построек: местные правила партии, разделы, поиск | `buildings.json` |
 | `participants.html` | рассадка 23 государств | `participants.json` |
 | `log.html` | история изменений | `changelog.json` + git |

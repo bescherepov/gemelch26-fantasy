@@ -30,7 +30,7 @@ nodes:
   - id: build
     path: build.py
     purpose: "Собирать статический сайт из data/ в dist/ без сети и внешних пакетов"
-    owns: [build, prepare_turns, prepare_buildings, build_type_stats, check_assets, load_json, fail, plural, TYPE_LABELS, PAGE_FILES, FACT_FIELDS]
+    owns: [build, prepare_turns, prepare_buildings, prepare_tables, build_type_stats, check_assets, load_json, fail, plural, TYPE_LABELS, PAGE_FILES, BUILDING_DETAIL_FIELDS, HEAT_LEVELS]
     depends: [engine, data, templates, site-css, site-js, assets-img, nuke-log]
     in: [data.TurnSource, templates.TemplateSource]
     out: [dist.Pages, dist.Sitemap]

@@ -7,7 +7,7 @@
 # DEPENDS:   validate:check_table_part, validate:check_link, validate:check_dist
 # EXPOSES:   ValidateHelpersTest
 # ERRORS:    AssertionError — проверка валидатора не совпала с ожиданием.
-# TESTS:     T-VALIDATE-001, T-VALIDATE-002, T-VALIDATE-003, T-VALIDATE-004, T-VALIDATE-005, T-VALIDATE-006, T-VALIDATE-007, T-VALIDATE-008
+# TESTS:     T-VALIDATE-001, T-VALIDATE-002, T-VALIDATE-003, T-VALIDATE-004, T-VALIDATE-005, T-VALIDATE-006, T-VALIDATE-007, T-VALIDATE-008, T-VALIDATE-009, T-VALIDATE-010, T-VALIDATE-011
 # ==== END MODULE CONTRACT: tests-validate ====
 """Тесты проверок таблиц и ссылок в scripts/validate.py."""
 
@@ -34,7 +34,7 @@ import validate  # noqa: E402
 #   —
 # ERRORS: AssertionError — проверка валидатора не совпала с ожиданием.
 # KEYWORDS: [Validate, Tables, Links, Dist]
-# TESTS: [T-VALIDATE-001, T-VALIDATE-002, T-VALIDATE-003, T-VALIDATE-004, T-VALIDATE-005, T-VALIDATE-006, T-VALIDATE-007, T-VALIDATE-008]
+# TESTS: [T-VALIDATE-001, T-VALIDATE-002, T-VALIDATE-003, T-VALIDATE-004, T-VALIDATE-005, T-VALIDATE-006, T-VALIDATE-007, T-VALIDATE-008, T-VALIDATE-009, T-VALIDATE-010, T-VALIDATE-011]
 class ValidateHelpersTest(unittest.TestCase):
     def setUp(self):
         base = ROOT / ".tmp"
@@ -74,6 +74,45 @@ class ValidateHelpersTest(unittest.TestCase):
         item = {"id": "table-1", "title": "Таблица", "caption": "Подпись", "file": "assets/img/table.png"}
         validate.check_table_part(item, "tables.json → tables[0]")
         self.assertEqual(validate.errors, [])
+
+    # TEST_ID: T-VALIDATE-009
+    def test_table_part__accepts_matrix_with_file(self):
+        item = {
+            "id": "goods-8",
+            "title": "Товары",
+            "caption": "Подпись",
+            "file": "assets/img/table-goods-8.png",
+            "layout": "matrix",
+            "heat": "log",
+            "columns": ["Товар", "Карр-Морн", "Тарг"],
+            "rows": [["Медь", "0", "4,5"], ["Соль", "3", "0"]],
+        }
+        validate.check_table_part(item, "tables.json → tables[0]")
+        self.assertEqual(validate.errors, [])
+
+    # TEST_ID: T-VALIDATE-010
+    def test_table_part__rejects_non_numeric_matrix_cell(self):
+        item = {
+            "id": "goods-8",
+            "layout": "matrix",
+            "columns": ["Товар", "Карр-Морн"],
+            "rows": [["Медь", "много"]],
+        }
+        validate.check_table_part(item, "tables.json → tables[0]")
+        self.assertEqual(len(validate.errors), 1)
+        self.assertIn("ожидалось число", validate.errors[0])
+
+    # TEST_ID: T-VALIDATE-011
+    def test_table_part__rejects_duplicate_matrix_rows(self):
+        item = {
+            "id": "goods-8",
+            "layout": "matrix",
+            "columns": ["Товар", "Карр-Морн"],
+            "rows": [["Медь", "1"], ["Медь", "2"]],
+        }
+        validate.check_table_part(item, "tables.json → tables[0]")
+        self.assertEqual(len(validate.errors), 1)
+        self.assertIn("повторяющаяся подпись строки", validate.errors[0])
 
     # TEST_ID: T-VALIDATE-004
     def test_link__accepts_existing_target(self):

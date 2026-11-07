@@ -1,6 +1,6 @@
 /* ==== MODULE CONTRACT: site-js ====
  * PURPOSE:   Улучшать интерфейс прогрессивно — меню, переключение ходов, поиск и фильтры, — не мешая чтению сайта без JavaScript.
- * SCOPE:     мобильное меню, вкладки и hash-навигация ходов, фильтры событий по типу, поиск по хронике, фильтр карт, поиск по постройкам, плавная прокрутка к якорям.
+ * SCOPE:     мобильное меню, вкладки и hash-навигация ходов, фильтры событий по типу, поиск по хронике, фильтр карт, поиск и сортировка таблицы построек, плавная прокрутка к якорям.
  * NON-GOALS: Не рендерить контент, не хранить данные, не заменять сборку страниц, не тянуть зависимости и сборщики.
  * INVARIANTS:без JS сайт остаётся читаемым — все ходы и карты отрендерены статически; улучшения включаются только при наличии data-хуков в разметке; выключенное улучшение не ломает остальные.
  * DEPENDS:   templates:HtmlHooks, site-css:Selectors
@@ -394,39 +394,54 @@
   }
   // END_BLOCK_MAPS_FILTER
 
-  // START_BLOCK_BUILDINGS_SEARCH: Поиск по каталогу построек и скрытие пустых разделов. #KEYWORDS: Buildings,Search,Catalog,Sections
+  // START_BLOCK_BUILDINGS_TABLE: Поиск и сортировка таблицы построек. #KEYWORDS: Buildings,Table,Search,Sort
   var buildingSearch = document.querySelector("[data-buildings-search]");
   var buildingInput = document.querySelector("[data-buildings-input]");
   var buildingHint = document.querySelector("[data-buildings-hint]");
+  var buildingTables = Array.prototype.slice.call(document.querySelectorAll("[data-buildings-table]"));
 
-  if (buildingSearch && buildingInput) {
-    var buildingCards = Array.prototype.slice.call(document.querySelectorAll(".building"));
+  if (buildingSearch && buildingInput && buildingTables.length) {
     var buildingSections = Array.prototype.slice.call(
       document.querySelectorAll('section[id^="cat-"]')
     );
 
     buildingSearch.hidden = false;
 
-    /* PURPOSE:   Отфильтровать карточки построек по запросу и спрятать опустевшие разделы.
+    /* PURPOSE:   Собрать все строки таблиц построек в один список для поиска.
+     * INPUTS:    нет — читает контейнеры [data-buildings-table].
+     * OUTPUTS:   массив строк таблиц.
+     * ERRORS:    нет — при пустых таблицах возвращается пустой массив.
+     * KEYWORDS:  [Buildings, Rows, Table, Search]
+     * TESTS:     [T-SITE-002, T-SITE-004] */
+    function buildingRows() {
+      var rows = [];
+      buildingTables.forEach(function (table) {
+        rows = rows.concat(Array.prototype.slice.call(table.querySelectorAll("tbody tr")));
+      });
+      return rows;
+    }
+
+    /* PURPOSE:   Отфильтровать строки построек по запросу и спрятать опустевшие разделы.
      * INPUTS:    нет — читает значение [data-buildings-input].
-     * OUTPUTS:   нет — меняет hidden у карточек и разделов, обновляет [data-buildings-hint].
+     * OUTPUTS:   нет — меняет hidden у строк и разделов, обновляет [data-buildings-hint].
      * ERRORS:    нет — пустой запрос показывает всё.
      * KEYWORDS:  [Buildings, Filter, Sections, Hint, Search]
      * TESTS:     [T-SITE-002, T-SITE-004] */
     function filterBuildings() {
       var query = normalize(buildingInput.value.trim());
+      var rows = buildingRows();
       var found = 0;
 
-      buildingCards.forEach(function (card) {
-        var match = !query || normalize(card.textContent).indexOf(query) !== -1;
-        card.hidden = !match;
+      rows.forEach(function (row) {
+        var match = !query || normalize(row.textContent).indexOf(query) !== -1;
+        row.hidden = !match;
         if (match) {
           found += 1;
         }
       });
 
       buildingSections.forEach(function (section) {
-        var visible = section.querySelectorAll(".building:not([hidden])").length;
+        var visible = section.querySelectorAll("tbody tr:not([hidden])").length;
         section.hidden = query !== "" && visible === 0;
       });
 
@@ -441,6 +456,105 @@
       }
     }
 
+    /* PURPOSE:   Отсортировать строки одной таблицы по числовому или текстовому ключу.
+     * INPUTS:    table — контейнер таблицы; key — имя data-атрибута; type — "number" или "text"; ascending — направление.
+     * OUTPUTS:   нет — переставляет строки tbody.
+     * ERRORS:    нет — пустые числовые значения уходят в конец.
+     * KEYWORDS:  [Buildings, Sort, Rows, Numbers]
+     * TESTS:     [T-SITE-002, T-SITE-004] */
+    function sortBuildingRows(table, key, type, ascending) {
+      var body = table.querySelector("tbody");
+      if (!body) {
+        return;
+      }
+      var rows = Array.prototype.slice.call(body.querySelectorAll("tr"));
+
+      rows.sort(function (left, right) {
+        var leftValue = left.getAttribute("data-" + key) || "";
+        var rightValue = right.getAttribute("data-" + key) || "";
+
+        if (type === "number") {
+          var leftNumber = leftValue === "" ? null : parseFloat(leftValue);
+          var rightNumber = rightValue === "" ? null : parseFloat(rightValue);
+          if (leftNumber === null && rightNumber === null) {
+            return 0;
+          }
+          if (leftNumber === null) {
+            return 1;
+          }
+          if (rightNumber === null) {
+            return -1;
+          }
+          return ascending ? leftNumber - rightNumber : rightNumber - leftNumber;
+        }
+
+        var a = normalize(leftValue);
+        var b = normalize(rightValue);
+        if (a < b) {
+          return ascending ? -1 : 1;
+        }
+        if (a > b) {
+          return ascending ? 1 : -1;
+        }
+        return 0;
+      });
+
+      rows.forEach(function (row) {
+        body.appendChild(row);
+      });
+    }
+
+    /* PURPOSE:   Включить сортировку по клику и с клавиатуры на заголовках с [data-sort].
+     * INPUTS:    нет — читает [data-buildings-table] и [data-sort].
+     * OUTPUTS:   нет — вешает обработчики, выставляет aria-sort.
+     * ERRORS:    нет — таблица без заголовков остаётся как есть.
+     * KEYWORDS:  [Buildings, Sort, Header, Keyboard, Aria]
+     * TESTS:     [T-SITE-002, T-SITE-004] */
+    function setupBuildingSort() {
+      buildingTables.forEach(function (wrapper) {
+        var table = wrapper.querySelector("table");
+        if (!table) {
+          return;
+        }
+        var headers = Array.prototype.slice.call(table.querySelectorAll("thead th[data-sort]"));
+
+        headers.forEach(function (header) {
+          var descending = false;
+
+          header.setAttribute("tabindex", "0");
+          header.setAttribute("role", "button");
+
+          function apply() {
+            headers.forEach(function (other) {
+              other.removeAttribute("aria-sort");
+            });
+            header.setAttribute("aria-sort", descending ? "descending" : "ascending");
+            sortBuildingRows(
+              table,
+              header.getAttribute("data-sort"),
+              header.getAttribute("data-sort-type"),
+              !descending
+            );
+          }
+
+          function toggle() {
+            descending = !descending;
+            apply();
+          }
+
+          header.addEventListener("click", toggle);
+          header.addEventListener("keydown", function (event) {
+            if (event.key === "Enter" || event.key === " ") {
+              event.preventDefault();
+              toggle();
+            }
+          });
+        });
+      });
+    }
+
+    setupBuildingSort();
+
     buildingInput.addEventListener("input", filterBuildings);
     buildingInput.addEventListener("keydown", function (event) {
       if (event.key === "Escape") {
@@ -449,7 +563,7 @@
       }
     });
   }
-  // END_BLOCK_BUILDINGS_SEARCH
+  // END_BLOCK_BUILDINGS_TABLE
 
   // START_BLOCK_SCROLL_OFFSET: Плавная прокрутка к якорям с поправкой на высоту шапки. #KEYWORDS: Anchor,Scroll,Hash,HeaderOffset
   document.addEventListener("click", function (event) {

@@ -6,7 +6,7 @@
 # DEPENDS:   build:*, validate:main, data:*, templates:*
 # EXPOSES:   BuildTest, run
 # ERRORS:    AssertionError — сборка или проверка не прошла.
-# TESTS:     T-BUILD-001, T-BUILD-002, T-BUILD-003, T-BUILD-004, T-BUILD-005, T-BUILD-006, T-BUILD-007, T-BUILD-008, T-BUILD-009, T-BUILD-010, T-BUILD-011, T-BUILD-012
+# TESTS:     T-BUILD-001, T-BUILD-002, T-BUILD-003, T-BUILD-004, T-BUILD-005, T-BUILD-006, T-BUILD-007, T-BUILD-008, T-BUILD-009, T-BUILD-010, T-BUILD-011, T-BUILD-012, T-BUILD-013, T-BUILD-014, T-BUILD-015, T-BUILD-016, T-BUILD-017
 # ==== END MODULE CONTRACT: tests-build ====
 """Интеграционные тесты сборки: собираем сайт и проверяем результат."""
 
@@ -198,6 +198,108 @@ class BuildTest(unittest.TestCase):
         result = run("scripts/validate.py", "--dist")
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("Данные: OK", result.stdout)
+
+    # TEST_ID: T-BUILD-013
+    def test_buildings__table_has_every_building(self):
+        import json
+
+        data = json.loads((ROOT / "data/buildings.json").read_text(encoding="utf-8"))
+        page = (DIST / "buildings.html").read_text(encoding="utf-8")
+        self.assertIn("bldg-table__table", page)
+        self.assertNotIn('class="building"', page)
+        self.assertEqual(page.count('<tr class="bldg"'), len(data["buildings"]))
+        for column in ("Постройка", "Цена", "Доход", "Производство", "Требования"):
+            with self.subTest(column=column):
+                self.assertIn(column, page)
+
+    # TEST_ID: T-BUILD-014
+    def test_buildings__sort_keys_and_details(self):
+        import json
+
+        data = json.loads((ROOT / "data/buildings.json").read_text(encoding="utf-8"))
+        page = (DIST / "buildings.html").read_text(encoding="utf-8")
+        self.assertIn('id="b-svinarnik" data-name="Свинарник" data-cost="25" data-income="0"', page)
+        self.assertIn("data-sort=\"cost\"", page)
+        self.assertIn("data-sort=\"income\"", page)
+        self.assertIn("cost-expensive", page)
+        self.assertIn("income-negative", page)
+        self.assertEqual(page.count('<tr class="bldg" id="b-'), len(data["buildings"]))
+        self.assertGreaterEqual(page.count("<details>"), len(data["buildings"]) - 5)
+        self.assertIn("Инновации и традиции", page)
+
+
+# PURPOSE: Проверять подготовку числовых таблиц на синтетических данных, чтобы раскраска и ошибки не зависели от содержимого data/.
+# INPUTS:
+#   нет: тесты вызывают prepare_tables напрямую.
+# OUTPUTS:
+#   нет: unittest фиксирует уровни раскраски и отказ при неверной ширине строки.
+# ERRORS: AssertionError — нарушение контракта prepare_tables.
+# KEYWORDS: [PrepareTables, Matrix, Heatmap, Tests]
+# TESTS: [T-BUILD-015, T-BUILD-016]
+class PrepareTablesTest(unittest.TestCase):
+    # TEST_ID: T-BUILD-015
+    def test_prepare_tables__builds_levels(self):
+        import build
+
+        raw = {
+            "tables": [
+                {
+                    "id": "demo",
+                    "layout": "matrix",
+                    "heat": "log",
+                    "columns": ["Товар", "А", "Б"],
+                    "rows": [["Медь", "0", "10"], ["Соль", "10", "0"], ["Уголь", "5", "5"]],
+                }
+            ]
+        }
+        table = build.prepare_tables(raw)["tables"][0]
+        matrix = table["matrix"]
+        self.assertEqual(matrix["columns"], ["А", "Б"])
+        self.assertEqual([row["label"] for row in matrix["rows"]], ["Медь", "Соль", "Уголь"])
+        for row in matrix["rows"]:
+            self.assertEqual(len(row["cells"]), 2)
+            for cell in row["cells"]:
+                self.assertTrue(0 <= cell["level"] < build.HEAT_LEVELS)
+        self.assertGreater(matrix["rows"][1]["cells"][0]["level"], matrix["rows"][0]["cells"][0]["level"])
+        self.assertEqual(matrix["rows"][0]["cells"][0]["level"], matrix["rows"][1]["cells"][1]["level"])
+
+    # TEST_ID: T-BUILD-017
+    def test_tables__matrix_renders_grid_and_heat(self):
+        import json
+
+        data = json.loads((ROOT / "data/tables.json").read_text(encoding="utf-8"))
+        page = (DIST / "tables.html").read_text(encoding="utf-8")
+        matrices = [table for table in data["tables"] if table.get("layout") == "matrix"]
+        self.assertTrue(matrices, "нет ни одной матричной таблицы")
+        for table in matrices:
+            with self.subTest(table=table["id"]):
+                marker = f'id="table-{table["id"]}"'
+                self.assertIn(marker, page)
+                block = page[page.index(marker):]
+                block = block[: block.index("</figure>")]
+                self.assertIn("matrix-table", block)
+                self.assertIn("heat-0", block)
+                for column in table["columns"][1:]:
+                    self.assertIn(column, block)
+                for row in table["rows"]:
+                    self.assertIn(f'<th scope="row">{row[0]}</th>', block)
+
+    # TEST_ID: T-BUILD-016
+    def test_prepare_tables__rejects_short_row(self):
+        import build
+
+        raw = {
+            "tables": [
+                {
+                    "id": "bad",
+                    "layout": "matrix",
+                    "columns": ["Товар", "А"],
+                    "rows": [["Медь"]],
+                }
+            ]
+        }
+        with self.assertRaises(SystemExit):
+            build.prepare_tables(raw)
 
 
 if __name__ == "__main__":

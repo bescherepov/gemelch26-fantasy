@@ -63,6 +63,19 @@ class ChangelogTest(unittest.TestCase):
     def test_run_git__outside_repository_returns_empty(self):
         temp_dir = Path(tempfile.mkdtemp(prefix="nuke-changelog-no-git-"))
         self.addCleanup(shutil.rmtree, temp_dir, True)
+        # В песочнице системный TEMP может быть недоступен, и tempfile кладёт каталог
+        # внутрь репозитория. Потолок поиска не даёт git увидеть .git выше временного каталога,
+        # поэтому тест проверяет отсутствие репозитория независимо от расположения TEMP.
+        previous = os.environ.get("GIT_CEILING_DIRECTORIES")
+        os.environ["GIT_CEILING_DIRECTORIES"] = str(temp_dir.parent)
+
+        def restore_env():
+            if previous is None:
+                os.environ.pop("GIT_CEILING_DIRECTORIES", None)
+            else:
+                os.environ["GIT_CEILING_DIRECTORIES"] = previous
+
+        self.addCleanup(restore_env)
         self._patch("ROOT", temp_dir)
         self.assertEqual(changelog.run_git(["log", "--format=%H"]), "")
 
