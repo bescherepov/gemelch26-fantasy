@@ -1,8 +1,14 @@
 # AGENTS.md — инструкции для агента
 
+## NUKE
+
+Работай по стандарту NUKE.md (локальный документ, в репозиторий не входит).
+Перед правкой кода пройди §10 (навигация),
+изменения оформляй строго по §8, перед ответом — чек-лист §12.
+
 ## 1. Что это за проект
 
-Сайт-хроника текстовой партии «Гегемония» о мире Расфадаль (900–915 гг.).
+Сайт-хроника текстовой партии «Гегемония» о мире Расфадаль (900–935 гг.).
 Живой сайт: <https://bescherepov.github.io/gemelch26-fantasy/>
 
 - Стек: **Python 3.9+ (только стандартная библиотека) + HTML/CSS/vanilla JS**.
@@ -12,8 +18,8 @@
 
 Полная архитектура — в [CONCEPT.md](CONCEPT.md), быстрый старт — в [README.md](README.md).
 
-Текущее состояние: 4 хода, 57 событий, 9 народов, 5 карт, 136 построек,
-11 страниц, 38 тестов.
+Текущее состояние: 8 ходов, 126 событий, 9 народов, 9 карт, 137 построек,
+11 страниц, 83 теста.
 
 ---
 
@@ -63,10 +69,14 @@ gemelch26-fantasy/
 ├── sources/                      # исходники мастера (docx) — не редактировать
 ├── scripts/
 │   ├── validate.py               # проверка данных и ссылок
-│   └── changelog.py              # лог из истории git
-├── tests/                        # unittest: движок и сборка
+│   ├── changelog.py              # лог из истории git
+│   └── nuke_audit.py             # аудит контрактов и якорей NUKE
+├── nuke/
+│   └── graph.yaml                # граф архитектуры NUKE
+├── tests/                        # unittest: движок, сборка, журнал, NUKE
 ├── build.py                      # генератор dist/
 ├── engine.py                     # движок шаблонов
+├── nuke_log.py                   # журнал операций (Log Driven Development)
 ├── CONCEPT.md
 ├── README.md
 └── dist/                         # результат сборки (в .gitignore)
@@ -155,7 +165,7 @@ gemelch26-fantasy/
 5. Собрать: `python build.py`.
 6. Полный прогон: `python -m unittest discover -s tests` и
    `python scripts/validate.py --dist`.
-7. Коммит на русском: `Добавлен 4-й ход (915 г.)`.
+7. Коммит на русском: `Добавлен 8-й ход (935 г.)`.
 8. Пуш в `main` — сайт опубликуется сам.
 
 ### Добавить карту или таблицу
@@ -188,7 +198,7 @@ gemelch26-fantasy/
 
 ### Сменить обложку
 
-`hero_map` выбирается в `build.py` по `id` карты (`political-915`); достаточно
+`hero_map` выбирается в `build.py` по `id` карты (`political-935`); достаточно
 добавить карту с нужным `id` или изменить выбор в одном месте.
 
 ---
@@ -200,7 +210,7 @@ gemelch26-fantasy/
 
 - В лог попадают только коммиты, менявшие `data/`, — то есть игровые изменения.
 - Сообщение коммита = будущая запись лога. Писать кратко и по-русски:
-  `Добавлен 4-й ход (915 г.)`, `Обновлена политическая карта`.
+  `Добавлен 8-й ход (935 г.)`, `Обновлена политическая карта`.
 - Технические коммиты (вёрстка, тесты, документация) не трогают `data/` и потому
   в лог не попадают.
 - Merge/revert/WIP пропускаются; коммит, создающий `data/site.json` (первичная
@@ -213,14 +223,15 @@ gemelch26-fantasy/
 
 ```bash
 python scripts/validate.py            # данные
-python -m unittest discover -s tests  # 38 тестов движка и сборки
+python -m unittest discover -s tests  # 83 теста движка, сборки и NUKE
 python build.py                       # dist/
 python scripts/validate.py --dist     # ссылки, якоря, h1, meta
+python scripts/nuke_audit.py          # контракты, якоря, граф, логи
 python -m http.server 8000 -d dist    # локальный просмотр
 ```
 
 Порядок в CI (`.github/workflows/pages.yml`):
-`validate` → `tests` → `changelog` → `build` → `validate --dist` → deploy.
+`validate` → `tests` → `changelog` → `build` → `validate --dist` → `nuke_audit` → deploy.
 
 **Definition of Done** для любой правки:
 
@@ -316,4 +327,5 @@ python -m http.server 8000 -d dist    # локальный просмотр
 - Команды и структура — [README.md](README.md).
 - Примеры данных — `data/turns/900.json`, `data/ethnoses.json`, `data/world.json`.
 - Примеры шаблонов — `templates/turns.html`, `templates/base.html`.
-- Проверки — `scripts/validate.py`, `tests/test_engine.py`, `tests/test_build.py`.
+- Проверки — `scripts/validate.py`, `scripts/nuke_audit.py`, `tests/test_engine.py`,
+  `tests/test_build.py`, `tests/test_nuke.py`.
